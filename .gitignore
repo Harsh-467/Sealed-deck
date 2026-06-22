@@ -1,0 +1,27 @@
+# ---- secrets ----
+.env
+.env.*
+!.env.example
+*.key
+
+# ---- node ----
+node_modules/
+dist/
+build/
+.vite/
+*.log
+npm-debug.log*
+.pnpm-debug.log*
+
+# ---- foundry ----
+contracts/out/
+contracts/cache/
+contracts/broadcast/**/dry-run/
+contracts/.gas-snapshot
+
+# ---- misc ----
+.DS_Store
+coverage/
+.idea/
+.vscode/*
+!.vscode/extensions.json

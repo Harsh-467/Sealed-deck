@@ -1,0 +1,23 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.24"
+optimizer = true
+optimizer_runs = 200
+via_ir = false
+fs_permissions = [{ access = "read", path = "./" }]
+
+# Fuji C-Chain (chainId 43113)
+[rpc_endpoints]
+fuji = "${FUJI_RPC_URL}"
+
+[etherscan]
+# Snowtrace (Routescan) verification for Fuji testnet.
+# Routescan exposes an Etherscan-compatible API; api key can be a placeholder like "verifyContract".
+fuji = { key = "${SNOWTRACE_API_KEY}", url = "https://api.routescan.io/v2/network/testnet/evm/43113/etherscan", chain = 43113 }
+
+[fmt]
+line_length = 110
+tab_width = 4
+bracket_spacing = true

@@ -1,0 +1,24 @@
+{
+  "name": "@sealed-deck/mental-poker",
+  "version": "0.1.0",
+  "description": "SRA commutative-encryption mental-poker deck (shuffle, lock dance, selective reveal) + hand evaluation.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "bigint-crypto-utils": "^3.3.0",
+    "pokersolver": "^2.1.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

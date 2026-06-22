@@ -1,0 +1,11 @@
+{
+  "name": "@sealed-deck/contracts-abi",
+  "version": "0.1.0",
+  "description": "Typed PokerTable ABI shared by the server and frontend (generated from Foundry).",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

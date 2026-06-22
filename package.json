@@ -1,0 +1,21 @@
+{
+  "name": "sealed-deck",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Trustless, provably-fair heads-up poker on Avalanche Fuji (mental poker + on-chain settlement).",
+  "workspaces": [
+    "packages/*",
+    "server",
+    "frontend"
+  ],
+  "scripts": {
+    "test": "npm run test --workspace @sealed-deck/mental-poker",
+    "test:crypto": "npm run test --workspace @sealed-deck/mental-poker",
+    "dev:server": "npm run dev --workspace @sealed-deck/server",
+    "dev:web": "npm run dev --workspace @sealed-deck/frontend",
+    "build": "npm run build --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

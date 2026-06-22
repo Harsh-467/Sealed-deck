@@ -1,0 +1,35 @@
+# One-command host for the Sealed Deck demo (run on your Mac):
+#   docker compose up --build
+#
+# Remote player joins over the VPN at  http://<MAC_VPN_IP>:5173
+# For that to work, set these in .env BEFORE `up` so the frontend points at the Mac:
+#   VITE_PUBLIC_SERVER_URL=http://<MAC_VPN_IP>:8787
+#   VITE_POKER_TABLE_ADDRESS=<deployed table address>
+# Both players also need MetaMask on Fuji (43113) with faucet AVAX (and faucet USDC
+# for the x402 buy-in path).
+
+services:
+  server:
+    build: .
+    image: sealed-deck
+    env_file: .env
+    command: npm run start -w @sealed-deck/server
+    environment:
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8787
+    ports:
+      - "8787:8787"
+    restart: unless-stopped
+
+  web:
+    build: .
+    image: sealed-deck
+    env_file: .env
+    # Vite dev server injects VITE_* from the environment at request time, so the
+    # table address / server URL can change without a rebuild.
+    command: npm run dev -w @sealed-deck/frontend -- --host 0.0.0.0 --port 5173
+    ports:
+      - "5173:5173"
+    depends_on:
+      - server
+    restart: unless-stopped

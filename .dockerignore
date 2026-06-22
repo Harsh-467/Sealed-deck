@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/.vite
+contracts/out
+contracts/cache
+contracts/broadcast
+.git
+*.log
+.env
+.env.*
+!.env.example
