@@ -42,6 +42,9 @@ export class Room {
   readonly tableId: string;
   private chain: TableChain;
   private conns: (Conn | null)[] = [null, null];
+  // Connections whose wallet hasn't appeared in the on-chain players[] yet. They are
+  // promoted to a real seat by reconcileSeats() once their joinTable() is observed.
+  private pending: { ws: WebSocket; address: string }[] = [];
 
   private chainState: ChainState | null = null;
 
@@ -73,35 +76,56 @@ export class Room {
   async attach(ws: WebSocket, address: string): Promise<void> {
     await this.refresh();
     const addr = address.toLowerCase();
+
+    ws.on('close', () => {
+      for (const s of [0, 1] as Seat[]) if (this.conns[s]?.ws === ws) this.conns[s] = null;
+      this.pending = this.pending.filter((p) => p.ws !== ws);
+      this.broadcastState();
+    });
+
     const seat = this.seatOf(addr);
+    console.log(
+      `[room ${short(this.tableId)}] attach ${short(addr)} -> seat ${seat ?? 'PENDING'} ` +
+        `(chain players: ${this.chainState?.players.map((p) => (p ? short(p) : '—')).join(', ')})`,
+    );
+
     if (seat === null) {
-      send(ws, { t: 'info', message: 'Join the table on-chain first, then reconnect.' });
-      // keep socket as spectator: still stream state
-      ws.on('message', (raw) => this.handleSpectator(ws, raw.toString()));
+      // Wallet connected before its joinTable() is on-chain. Remember it and stream state;
+      // reconcileSeats() promotes it to a seat as soon as the join is observed.
+      this.pending.push({ ws, address: addr });
+      send(ws, { t: 'info', message: 'Waiting to be seated — take a seat on-chain.' });
       this.sendState(ws, null);
       return;
     }
-    // replace any stale connection for this seat
-    this.conns[seat]?.ws.close();
+    this.seatConn(ws, addr, seat);
+    this.maybeOrchestrate();
+  }
+
+  /** Wire a connection into a concrete seat. */
+  private seatConn(ws: WebSocket, addr: string, seat: Seat): void {
+    this.conns[seat]?.ws.close(); // replace any stale connection for this seat
     const conn: Conn = { ws, seat, address: addr };
     this.conns[seat] = conn;
     send(ws, { t: 'seat', seat });
     ws.on('message', (raw) => void this.handle(conn, raw.toString()));
-    ws.on('close', () => {
-      if (this.conns[seat] === conn) this.conns[seat] = null;
-      this.broadcastState();
-    });
     this.broadcastState();
-    this.maybeOrchestrate();
   }
 
-  private handleSpectator(ws: WebSocket, raw: string): void {
-    try {
-      const msg = JSON.parse(raw) as ClientMessage;
-      if (msg.t === 'hello') void this.refresh().then(() => this.sendState(ws, null));
-    } catch {
-      /* ignore */
+  /** Promote any pending connection whose wallet now appears in players[]. */
+  private reconcileSeats(): void {
+    if (this.pending.length === 0) return;
+    const still: { ws: WebSocket; address: string }[] = [];
+    for (const p of this.pending) {
+      if (p.ws.readyState !== p.ws.OPEN) continue;
+      const seat = this.seatOf(p.address);
+      if (seat === null) {
+        still.push(p);
+      } else {
+        console.log(`[room ${short(this.tableId)}] promoted ${short(p.address)} -> seat ${seat}`);
+        this.seatConn(p.ws, p.address, seat);
+      }
     }
+    this.pending = still;
   }
 
   private seatOf(addr: string): Seat | null {
@@ -191,7 +215,9 @@ export class Room {
 
   private onShuffle(conn: Conn, stage: ShuffleStage, deck: string[]): void {
     const expected = SHUFFLE_SEQ[this.nextStage];
+    console.log(`[room ${short(this.tableId)}] shuffle '${stage}' from seat${conn.seat} (expected '${expected}')`);
     if (stage !== expected || SHUFFLE_SENDER[stage] !== conn.seat) {
+      console.warn(`[room ${short(this.tableId)}] REJECT shuffle '${stage}' from seat${conn.seat}`);
       return send(conn.ws, { t: 'error', message: `unexpected shuffle stage ${stage}` });
     }
     const other: Seat = conn.seat === 0 ? 1 : 0;
@@ -212,6 +238,8 @@ export class Room {
 
   private startShuffleIfNeeded(): void {
     if (this.nextStage === 0 && !this.finalDeck) {
+      const have0 = this.conns[0] !== null;
+      console.log(`[room ${short(this.tableId)}] kick shuffle -> seat0 (connected=${have0})`);
       this.toSeat(0, { t: 'startShuffle' });
     }
   }
@@ -221,6 +249,7 @@ export class Room {
   private requestDeal(): void {
     if (this.dealRequested) return;
     this.dealRequested = true;
+    console.log(`[room ${short(this.tableId)}] final deck ready -> dealing hole cards`);
     // Tell each seat its hole positions, and ask each to send the OPPONENT their
     // share for the opponent's hole positions.
     this.toSeat(0, { t: 'dealHole', positions: [...LAYOUT.holeSeat0] });
@@ -300,7 +329,8 @@ export class Room {
   private async refresh(): Promise<void> {
     const prev = this.chainState;
     this.chainState = await this.chain.readState();
-    // street/state-driven orchestration
+    // Seat anyone who has now joined on-chain, then run state-driven orchestration.
+    this.reconcileSeats();
     this.maybeOrchestrate();
     if (
       !prev ||
@@ -416,4 +446,8 @@ export class Room {
 
 function send(ws: WebSocket, msg: ServerMessage): void {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
+}
+
+function short(s: string): string {
+  return s.length > 10 ? `${s.slice(0, 6)}…${s.slice(-4)}` : s;
 }

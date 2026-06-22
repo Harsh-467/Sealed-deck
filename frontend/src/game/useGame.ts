@@ -80,6 +80,7 @@ export function useGame(): GameView {
   // ------------------------------ messages ------------------------------ //
   function handleMessage(msg: ServerMessage): void {
     const c = cryptoRef.current;
+    if (msg.t !== 'state') console.log('[sealed-deck ws<-]', msg.t, msg);
     switch (msg.t) {
       case 'seat':
         seatRef.current = msg.seat;
@@ -93,30 +94,60 @@ export function useGame(): GameView {
         break;
 
       case 'startShuffle':
-        void c.startShuffle().then((deck) => send({ t: 'shuffle', stage: 'encShuffleA', deck }));
+        console.log('[sealed-deck] starting shuffle dance (seat 0)…');
+        c.startShuffle()
+          .then((deck) => {
+            console.log('[sealed-deck] sent encShuffleA');
+            send({ t: 'shuffle', stage: 'encShuffleA', deck });
+          })
+          .catch((e) => {
+            console.error('[sealed-deck] startShuffle FAILED:', e);
+            setError(`Shuffle failed: ${errMsg(e)}`);
+          });
         break;
 
       case 'shuffle':
-        void c.onShuffle(msg.stage, msg.deck).then((nxt) => {
-          if (nxt) send({ t: 'shuffle', stage: nxt.stage, deck: nxt.deck });
-        });
+        console.log('[sealed-deck] got shuffle stage', msg.stage);
+        c.onShuffle(msg.stage, msg.deck)
+          .then((nxt) => {
+            if (nxt) {
+              console.log('[sealed-deck] sending next stage', nxt.stage);
+              send({ t: 'shuffle', stage: nxt.stage, deck: nxt.deck });
+            } else {
+              console.log('[sealed-deck] final deck received; awaiting deal');
+            }
+          })
+          .catch((e) => {
+            console.error('[sealed-deck] onShuffle FAILED at', msg.stage, e);
+            setError(`Deck sealing failed: ${errMsg(e)}`);
+          });
         break;
 
       case 'dealHole':
+        console.log('[sealed-deck] my hole positions', msg.positions);
         c.setHolePositions(msg.positions);
         break;
 
       case 'needShares':
-        for (const { position, share } of c.sharesFor(msg.positions)) {
-          send({ t: 'revealShare', toSeat: opp(), position, share });
+        try {
+          const shares = c.sharesFor(msg.positions);
+          console.log('[sealed-deck] sending', shares.length, 'shares for', msg.positions);
+          for (const { position, share } of shares) {
+            send({ t: 'revealShare', toSeat: opp(), position, share });
+          }
+        } catch (e) {
+          console.error('[sealed-deck] sharesFor FAILED:', e);
+          setError(`Reveal failed: ${errMsg(e)}`);
         }
         break;
 
       case 'revealShare': {
         const idx = c.onShare(msg.position, msg.share);
+        console.log('[sealed-deck] got share for pos', msg.position, '-> decoded card', idx);
         if (idx != null) setMyHole([...c.holeCards()]);
         if (c.holeReady() && !flags.current.dealReady) {
           flags.current.dealReady = true;
+          console.log('[sealed-deck] both hole cards read; dealReady');
           send({ t: 'dealReady' });
         }
         break;
