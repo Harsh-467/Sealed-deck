@@ -2,6 +2,12 @@
 # Multi-arch base — builds natively on Apple Silicon (arm64) and x86_64.
 FROM node:20-bookworm-slim
 
+# Build toolchain so optional native add-ons (e.g. ws's bufferutil/utf-8-validate)
+# can compile via node-gyp. Without these, npm install fails on slim images.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Install workspace deps first (better layer caching).

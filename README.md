@@ -133,6 +133,10 @@ You need a **fresh throwaway wallet** funded from the [Avalanche Fuji faucet](ht
 
 ```bash
 cd contracts
+# The deploy script reads PRIVATE_KEY (+ table params) from the environment. forge only
+# auto-loads a .env in the CURRENT folder, so load the repo-root one explicitly first:
+set -a; source ../.env; set +a
+echo "$PRIVATE_KEY"   # sanity: your real 0x key, not the placeholder
 
 # AVAX table (default demo)
 forge script script/Deploy.s.sol:Deploy \
