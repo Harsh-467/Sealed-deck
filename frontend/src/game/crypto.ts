@@ -46,45 +46,61 @@ export class GameCrypto {
     }
   }
 
-  /** Seat 0 begins the dance. Returns the encShuffleA deck to send. */
+  // Idempotency caches: re-processing the same stage (e.g. after a reconnect or a
+  // duplicate relay) must NOT regenerate keys — that would corrupt the deck. We cache
+  // each stage's output and replay it verbatim.
+  private encA: string[] | null = null;
+  private stageOut = new Map<ShuffleStage, { stage: ShuffleStage; deck: string[] } | null>();
+
+  /** Seat 0 begins the dance. Returns the encShuffleA deck to send (cached/idempotent). */
   async startShuffle(): Promise<string[]> {
     this.ensureSeed();
     await this.ensureInit();
-    return enc(this.participant.encryptAndShuffle(freshDeck(), this.seed!));
+    if (!this.encA) this.encA = enc(this.participant.encryptAndShuffle(freshDeck(), this.seed!));
+    return this.encA;
   }
 
   /**
    * Handle an incoming shuffle stage. Returns the next stage to broadcast (or null if
-   * this stage produced the final deck for us).
+   * this stage produced the final deck for us). Idempotent per stage.
    */
   async onShuffle(
     stage: ShuffleStage,
     deck: string[],
   ): Promise<{ stage: ShuffleStage; deck: string[] } | null> {
+    if (this.stageOut.has(stage)) return this.stageOut.get(stage)!;
     const d = dec(deck);
+    let out: { stage: ShuffleStage; deck: string[] } | null = null;
     switch (stage) {
       case 'encShuffleA': {
         // we are seat 1: add our global lock + seeded shuffle
         this.ensureSeed();
         await this.ensureInit();
-        return { stage: 'encShuffleB', deck: enc(this.participant.encryptAndShuffle(d, this.seed!)) };
+        if (!this.encA) this.encA = enc(this.participant.encryptAndShuffle(d, this.seed!));
+        out = { stage: 'encShuffleB', deck: this.encA };
+        break;
       }
       case 'encShuffleB': {
         // we are seat 0: strip global, add per-card locks
-        return { stage: 'relockA', deck: enc(await this.participant.relock(d)) };
+        out = { stage: 'relockA', deck: enc(await this.participant.relock(d)) };
+        break;
       }
       case 'relockA': {
         // we are seat 1: strip global, add per-card locks -> final deck
         const d4 = await this.participant.relock(d);
         this.finalDeck = d4;
-        return { stage: 'relockB', deck: enc(d4) };
+        out = { stage: 'relockB', deck: enc(d4) };
+        break;
       }
       case 'relockB': {
         // we are seat 0: this is the final double-locked deck
         this.finalDeck = d;
-        return null;
+        out = null;
+        break;
       }
     }
+    this.stageOut.set(stage, out);
+    return out;
   }
 
   setHolePositions(positions: number[]): void {

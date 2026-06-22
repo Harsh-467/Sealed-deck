@@ -1,4 +1,3 @@
-import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -12,12 +11,13 @@ document.head.appendChild(style);
 
 const queryClient = new QueryClient();
 
+// NOTE: intentionally NOT wrapped in <React.StrictMode>. In dev, StrictMode mounts→
+// unmounts→remounts every component, which tore down and recreated the WebSocket (and
+// reset the per-hand crypto state) mid-deal, stalling the padlock dance.
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>
-    </WagmiProvider>
-  </React.StrictMode>,
+  <WagmiProvider config={wagmiConfig}>
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
+  </WagmiProvider>,
 );

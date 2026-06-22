@@ -50,6 +50,9 @@ export class Room {
 
   // --- off-chain progress ---
   private nextStage = 0; // index into SHUFFLE_SEQ
+  private kickSent = false; // startShuffle sent to the current seat-0 connection
+  // last shuffle blob relayed to each seat, for resend on reconnect
+  private lastRelay: ({ stage: ShuffleStage; deck: string[]; fromSeat: Seat } | null)[] = [null, null];
   private finalDeck: string[] | null = null; // D4 ciphertext blobs (opaque to server)
   private dealReady: [boolean, boolean] = [false, false];
   private dealRequested = false;
@@ -109,6 +112,28 @@ export class Room {
     send(ws, { t: 'seat', seat });
     ws.on('message', (raw) => void this.handle(conn, raw.toString()));
     this.broadcastState();
+    this.resumeForSeat(seat);
+  }
+
+  /** After a (re)connect, re-drive whatever dance step this seat still owes, so a
+   *  dropped/replaced socket doesn't permanently stall the hand. */
+  private resumeForSeat(seat: Seat): void {
+    if (this.dealReady[seat]) return; // this seat already finished the deal
+    // shuffle phase: re-kick seat 0, and resend the last blob this seat needed.
+    if (!this.finalDeck && seat === 0 && this.nextStage === 0) this.kickSent = false;
+    const relay = this.lastRelay[seat];
+    if (relay) {
+      this.toSeat(seat, { t: 'shuffle', stage: relay.stage, deck: relay.deck, fromSeat: relay.fromSeat });
+    }
+    // deal phase: re-prompt this seat and ask the opponent to resend its hole shares.
+    if (this.finalDeck && this.dealRequested) {
+      const mine = seat === 0 ? [...LAYOUT.holeSeat0] : [...LAYOUT.holeSeat1];
+      const theirs = seat === 0 ? [...LAYOUT.holeSeat1] : [...LAYOUT.holeSeat0];
+      const opp: Seat = seat === 0 ? 1 : 0;
+      this.toSeat(seat, { t: 'dealHole', positions: mine });
+      this.toSeat(seat, { t: 'needShares', positions: theirs, forPhase: 'deal' });
+      this.toSeat(opp, { t: 'needShares', positions: mine, forPhase: 'deal' });
+    }
   }
 
   /** Promote any pending connection whose wallet now appears in players[]. */
@@ -226,10 +251,12 @@ export class Room {
       // Final double-locked deck. Opaque to the server.
       this.finalDeck = deck;
       // seat1 produced it; make sure seat0 also receives it.
+      this.lastRelay[0] = { stage, deck, fromSeat: 1 };
       this.toSeat(0, { t: 'shuffle', stage, deck, fromSeat: 1 });
       this.nextStage = SHUFFLE_SEQ.length;
       this.requestDeal();
     } else {
+      this.lastRelay[other] = { stage, deck, fromSeat: conn.seat };
       this.toSeat(other, { t: 'shuffle', stage, deck, fromSeat: conn.seat });
       this.nextStage++;
     }
@@ -237,9 +264,9 @@ export class Room {
   }
 
   private startShuffleIfNeeded(): void {
-    if (this.nextStage === 0 && !this.finalDeck) {
-      const have0 = this.conns[0] !== null;
-      console.log(`[room ${short(this.tableId)}] kick shuffle -> seat0 (connected=${have0})`);
+    if (this.nextStage === 0 && !this.finalDeck && this.conns[0] && !this.kickSent) {
+      this.kickSent = true;
+      console.log(`[room ${short(this.tableId)}] kick shuffle -> seat0`);
       this.toSeat(0, { t: 'startShuffle' });
     }
   }
