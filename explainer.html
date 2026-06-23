@@ -582,6 +582,7 @@ h2.title.wide{max-width:22ch;}
     if(idOf(i)!=='title') revealSlide(slides[i]);
     renderNotes();
     onActivate(idOf(i));
+    try{ history.replaceState(null,'','#'+idOf(i)); }catch(e){}
   }
 
   function onActivate(id){
@@ -657,9 +658,17 @@ h2.title.wide{max-width:22ch;}
   function demoControl(on){ if(on){ if(running)return; running=true; si=0; setStage(0); timer=setTimeout(tick,1800);} else { running=false; clearTimeout(timer);} }
   if(reduce) setStage(6);
 
-  // boot
+  // boot — support #<id> or #<n> deep-links (used for jumping + headless screenshots)
+  function indexFromHash(){
+    const h=decodeURIComponent((location.hash||'').replace('#','')).trim();
+    if(!h) return 0;
+    const byId=slides.findIndex(s=>s.dataset.id===h);
+    if(byId>=0) return byId;
+    const n=parseInt(h,10); return (!isNaN(n)&&n>=1&&n<=N)?n-1:0;
+  }
   if(reduce){ slides.forEach((s,j)=>{ s.style.display=j===0?'grid':'none'; }); }
-  go(0);
+  go(indexFromHash());
+  addEventListener('hashchange',()=>{ const i=indexFromHash(); if(i!==cur) go(i); });
 })();
 </script>
 </body>

@@ -4,24 +4,38 @@ Trustless heads-up poker on Avalanche Fuji. Two players collaboratively shuffle 
 
 Built for an Avalanche hackathon. Fuji C-Chain (`43113`). One hand per contract instance.
 
+<p align="center">
+  <img src="docs/screenshots/title.png" alt="Sealed Deck — provably-fair heads-up poker on Avalanche" width="900">
+</p>
+
+<p align="center"><em>An interactive walkthrough of the design ships in <a href="explainer.html"><code>explainer.html</code></a>.</em></p>
+
 ---
 
 ## Architecture
 
-```
-┌─────────────┐   WS (encrypted card blobs)   ┌─────────────┐
-│  Player A   │◀────────────────────────────▶│  Player B   │
-│  (wagmi+SRA)│       ┌────────────┐          │  (wagmi+SRA)│
-└──────┬──────┘       │   Relay    │          └──────┬──────┘
-       │              │ (no keys)  │                 │
-       ▼              └────────────┘                 ▼
-       PokerTable.sol @ Fuji — escrow, betting, settle, timeout
-```
+<p align="center">
+  <img src="docs/screenshots/architecture.png" alt="Two browsers, a keyless relay, and the PokerTable contract on Avalanche Fuji" width="840">
+</p>
 
 - **Contracts** (`contracts/`) — `PokerTable.sol` (AVAX) and `PokerTableUSDC.sol` (x402 USDC buy-in): on-chain escrow, betting accounting, commit/reveal, dual-signed settlement, timeout/slash
 - **Crypto** (`packages/mental-poker/`) — SRA commutative encryption for card secrecy, seeded shuffle with commit-reveal for shuffle fairness. Runs client-side; server never sees a private card
 - **Server** (`server/`) — WebSocket relay + per-hand FSM + Fuji chain watcher + x402 buy-in middleware. Holds no keys, signs nothing
 - **Frontend** (`frontend/`) — React/Vite, wagmi/viem
+
+---
+
+## Provably fair
+
+Two mechanisms keep the game honest with no trusted dealer:
+
+- **SRA commutative encryption — the "padlock dance."** Each card is a number locked with a player's secret key; the locks *commute*, so both players lock and shuffle the deck, then peel a single lock to deal a card only its owner can read.
+- **Commit–reveal.** Before any card moves, each player publishes `keccak256(seed)` on-chain; at showdown the seeds are revealed and verified — so nobody could have re-picked their shuffle after seeing the other's.
+
+<p align="center">
+  <img src="docs/screenshots/padlock-dance.png" alt="SRA commutative encryption — the padlock dance" width="49%">
+  <img src="docs/screenshots/commit-reveal.png" alt="Commit-reveal: lock the shuffle in before a card is seen" width="49%">
+</p>
 
 ---
 
@@ -37,6 +51,10 @@ The pot moves four ways only — no player can claim unilaterally:
 | 4 | **Void** — both reveal but never agree on a winner | `voidAndRefund` returns each player's own contribution |
 
 A griefer can force a void but can never steal the opponent's funds.
+
+<p align="center">
+  <img src="docs/screenshots/trust-model.png" alt="The four ways the pot can settle — no player can claim unilaterally" width="860">
+</p>
 
 ---
 
