@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sealed Deck — How trustless poker works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,600;0,6..96,700;0,6..96,800;0,6..96,900;1,6..96,500&family=Archivo:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --bg:#0c0807; --ink:#ece3d2; --inkDim:#9a8f7e; --inkFaint:#7c715f;
+  --gold:#c9a05c; --goldLt:#f6e6bf; --goldMd:#dcb978; --goldDk:#a87e3c; --goldText:#e7cf9b; --potText:#f3e1b4;
+  --cyan:#45d4e0; --cyanDim:#7fb8bf; --cyanGlow:rgba(69,212,224,.5);
+  --felt0:#204a40; --felt1:#173329; --felt2:#0e2019;
+  --avax:#e84142; --cardRed:#b3403a; --cardBlack:#2a2118;
+  --serif:'Bodoni Moda',serif; --sans:'Archivo',sans-serif; --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);scroll-behavior:smooth;-webkit-font-smoothing:antialiased;}
+body{overflow-x:hidden;}
+::selection{background:rgba(201,160,92,.3);color:#f3e8d0;}
+a{color:var(--cyanDim);text-decoration:none;}
+a:hover{color:var(--cyan);}
+code,.mono{font-family:var(--mono);}
+
+/* ---- ambient felt + vignette ---- */
+.backdrop{position:fixed;inset:0;z-index:-2;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(201,160,92,.07), transparent 55%),
+    radial-gradient(90% 70% at 50% 110%, rgba(32,74,64,.18), transparent 60%),
+    var(--bg);}
+.grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.04;
+  background-image:radial-gradient(rgba(255,255,255,.6) .5px, transparent .5px);background-size:3px 3px;}
+
+/* ---- layout ---- */
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px;}
+section{position:relative;padding:96px 0;}
+.kicker{display:inline-flex;align-items:center;gap:12px;color:var(--inkDim);font-size:11px;letter-spacing:.42em;text-transform:uppercase;}
+.kicker::before,.kicker::after{content:"";width:34px;height:1px;}
+.kicker::before{background:linear-gradient(90deg,transparent,var(--gold));}
+.kicker::after{background:linear-gradient(90deg,var(--gold),transparent);}
+h2.title{font-family:var(--serif);font-weight:800;font-size:clamp(30px,5vw,52px);line-height:1.02;letter-spacing:.01em;margin:18px 0 0;
+  background:linear-gradient(180deg,#f6e6bf,#dcb978 48%,#a87e3c);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.lede{max-width:640px;margin:20px 0 0;font-family:var(--serif);font-style:italic;font-size:21px;line-height:1.55;color:#cabfa9;}
+.body-copy{max-width:660px;color:var(--inkDim);font-size:15.5px;line-height:1.75;margin:18px 0 0;}
+.body-copy strong{color:var(--ink);font-weight:600;}
+.cy{color:var(--cyanDim);}.gd{color:var(--goldText);}
+
+/* ---- the brass seal emblem ---- */
+.seal{position:relative;display:grid;place-items:center;border-radius:50%;
+  background:radial-gradient(circle at 38% 30%,#f3dca4,#c9a05c 44%,#7d5f2c 100%);
+  box-shadow:inset 0 2px 4px rgba(255,248,224,.85),inset 0 -6px 14px rgba(50,32,8,.75),0 10px 34px rgba(0,0,0,.6),0 0 0 7px rgba(201,160,92,.08);
+  border:1px solid rgba(120,90,40,.8);}
+.seal .dash{position:absolute;inset:8px;border-radius:50%;border:1.5px dashed rgba(70,48,18,.5);}
+.seal .spade{font-family:var(--serif);color:#3a2a12;line-height:1;}
+.seal .lock{position:absolute;right:4px;bottom:4px;border-radius:50%;background:#0c1316;display:grid;place-items:center;
+  border:1.5px solid rgba(69,212,224,.55);box-shadow:0 0 14px rgba(69,212,224,.55),inset 0 0 8px rgba(69,212,224,.25);color:var(--cyan);
+  animation:lockglow 2.6s ease-in-out infinite;}
+
+/* ---- HERO ---- */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 24px;}
+.hero .spot{pointer-events:none;position:absolute;inset:0;background:radial-gradient(60% 50% at 50% 42%,rgba(201,160,92,.12),rgba(201,160,92,.03) 40%,transparent 70%);animation:spotbreath 6s ease-in-out infinite;}
+.hero .vig{pointer-events:none;position:absolute;inset:0;background:radial-gradient(75% 70% at 50% 45%,transparent 48%,rgba(6,4,4,.85));}
+.hero-inner{position:relative;animation:rise .9s ease both;display:flex;flex-direction:column;align-items:center;}
+.wordmark{margin:26px 0 0;font-family:var(--serif);font-weight:800;font-size:clamp(56px,12vw,108px);line-height:.9;letter-spacing:.02em;text-transform:uppercase;
+  background:linear-gradient(180deg,#f6e6bf 0%,#dcb978 42%,#a87e3c 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 2px 10px rgba(0,0,0,.5));}
+.rule-row{margin-top:12px;display:flex;align-items:center;gap:16px;color:var(--inkFaint);font-size:11px;letter-spacing:.5em;text-transform:uppercase;}
+.rule-row span.line{width:50px;height:1px;background:rgba(201,160,92,.4);}
+.hero-sub{max-width:600px;margin:34px 0 0;font-family:var(--serif);font-style:italic;font-weight:500;font-size:clamp(19px,2.4vw,25px);line-height:1.5;color:#cabfa9;}
+.fairtag{margin-top:28px;display:flex;align-items:center;gap:11px;color:var(--cyanDim);font-size:12.5px;letter-spacing:.06em;}
+.fairtag .tick{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;border:1px solid rgba(69,212,224,.5);background:rgba(69,212,224,.08);color:var(--cyan);font-size:11px;}
+.scrollcue{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);color:var(--inkFaint);font-size:10px;letter-spacing:.4em;text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:8px;animation:spotbreath 3s ease-in-out infinite;}
+.scrollcue .arr{font-size:14px;animation:nudge 1.8s ease-in-out infinite;}
+
+/* ---- reveal on scroll ---- */
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .7s ease,transform .7s ease;}
+.reveal.in{opacity:1;transform:none;}
+
+/* ---- generic panel ---- */
+.panel{background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.28);border-radius:14px;}
+.panel.cyan{background:linear-gradient(180deg,#0e1a1c,#0a1214);border-color:rgba(69,212,224,.3);}
+
+/* ---- problem stat band ---- */
+.statband{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:42px;}
+.stat{padding:26px 22px;text-align:center;}
+.stat .big{font-family:var(--serif);font-weight:700;font-size:40px;line-height:1;
+  background:linear-gradient(180deg,#f6e6bf,#cba055);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.stat .lbl{margin-top:10px;font-size:12px;color:var(--inkDim);line-height:1.5;}
+.stat.bad .big{background:linear-gradient(180deg,#f3a3a3,#e84142);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+
+/* ---- two-column ---- */
+.cols{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center;}
+.cols.rev{grid-template-columns:.95fr 1.05fr;}
+
+/* ---- playing cards ---- */
+.card{position:relative;width:62px;height:88px;border-radius:8px;font-family:var(--serif);display:grid;place-items:center;flex:none;
+  background:linear-gradient(162deg,#f8f2e6,#e9ddc5);border:1px solid #cdbd9a;box-shadow:inset 0 1px 2px rgba(255,255,255,.9),0 6px 13px rgba(0,0,0,.4);}
+.card .big{font-size:38px;}
+.card .corner{position:absolute;display:flex;flex-direction:column;align-items:center;line-height:.82;}
+.card .corner.tl{top:5px;left:7px;}
+.card .corner.br{bottom:5px;right:7px;transform:rotate(180deg);}
+.card .corner .rk{font-size:18px;font-weight:600;}
+.card .corner .pp{font-size:13px;}
+.card.red,.card.red .big{color:var(--cardRed);}
+.card.black,.card.black .big{color:var(--cardBlack);}
+.card.win{border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,160,92,.5),0 8px 18px rgba(0,0,0,.5);}
+
+/* ---- locked card ---- */
+.locked{position:relative;width:62px;height:88px;border-radius:8px;overflow:hidden;flex:none;
+  background:repeating-linear-gradient(45deg,#3a181b 0 7px,#2a1013 7px 14px);border:1.5px solid rgba(69,212,224,.35);box-shadow:0 7px 16px rgba(0,0,0,.5);}
+.locked.brass{background:repeating-linear-gradient(45deg,#6e1a20 0 7px,#561318 7px 14px);border-color:rgba(201,160,92,.55);}
+.locked .shim{position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(69,212,224,.28) 50%,transparent 70%);background-size:220% 100%;mix-blend-mode:screen;animation:shimmer 2.6s linear infinite;}
+.locked .pad{position:absolute;inset:0;display:grid;place-items:center;font-size:26px;color:var(--cyan);animation:lockglow 2.4s ease-in-out infinite;}
+.locked.brass .pad{color:var(--goldText);}
+
+/* ---- chips ---- */
+.chip{width:34px;height:34px;border-radius:50%;border:3px dashed rgba(60,40,12,.5);box-shadow:0 3px 8px rgba(0,0,0,.5);flex:none;
+  background:radial-gradient(circle at 50% 35%,#f6e6bf,#b98e44);}
+.chip.red{background:radial-gradient(circle at 50% 35%,#5a262b,#2a1013);border-color:rgba(120,40,40,.5);}
+
+/* ---- padlock dance diagram ---- */
+.dance{display:flex;flex-direction:column;gap:14px;margin-top:40px;}
+.danceRow{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:18px 20px;border-radius:12px;
+  background:linear-gradient(180deg,rgba(36,22,18,.7),rgba(21,14,12,.7));border:1px solid rgba(201,160,92,.18);}
+.danceRow .step{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--serif);font-weight:700;font-size:16px;color:#2a1e0c;
+  background:radial-gradient(circle at 38% 32%,#f0d79e,#c9a05c 60%,#8a6a32);box-shadow:0 2px 6px rgba(0,0,0,.5);}
+.danceRow .txt{flex:1;min-width:220px;font-size:14px;color:var(--inkDim);line-height:1.55;}
+.danceRow .txt b{color:var(--ink);font-weight:600;}
+.lockpill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:12px;font-family:var(--mono);
+  border:1px solid rgba(69,212,224,.35);background:rgba(69,212,224,.08);color:var(--cyan);white-space:nowrap;}
+.lockpill.gold{border-color:rgba(201,160,92,.4);background:rgba(201,160,92,.08);color:var(--goldText);}
+
+/* equation chip */
+.eq{display:inline-block;margin-top:26px;padding:16px 22px;border-radius:12px;font-family:var(--mono);font-size:15px;color:var(--cyanDim);
+  background:rgba(69,212,224,.05);border:1px solid rgba(69,212,224,.22);line-height:1.7;}
+.eq b{color:var(--cyan);font-weight:500;}
+
+/* ---- settlement: 4 ways ---- */
+.ways{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-top:40px;}
+.way{padding:24px 22px;border-radius:14px;background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.24);position:relative;overflow:hidden;}
+.way .num{font-family:var(--serif);font-size:13px;color:var(--gold);letter-spacing:.2em;}
+.way h4{margin:8px 0 0;font-family:var(--serif);font-weight:700;font-size:22px;color:var(--goldText);}
+.way p{margin:10px 0 0;font-size:13.5px;line-height:1.6;color:var(--inkDim);}
+.way .ic{position:absolute;top:18px;right:20px;font-size:22px;opacity:.5;}
+
+/* ---- flow rail ---- */
+.flow{display:flex;flex-wrap:wrap;gap:10px;margin-top:38px;align-items:stretch;}
+.phase{flex:1;min-width:120px;padding:16px 14px;border-radius:11px;background:linear-gradient(180deg,rgba(36,22,18,.6),rgba(21,14,12,.6));border:1px solid rgba(201,160,92,.16);position:relative;}
+.phase .ph-i{font-size:18px;}
+.phase .ph-n{margin-top:8px;font-family:var(--serif);font-size:16px;color:var(--ink);}
+.phase .ph-d{margin-top:5px;font-size:11.5px;color:var(--inkFaint);line-height:1.45;}
+.phase.chain{border-color:rgba(201,160,92,.4);}
+.phase.crypto{border-color:rgba(69,212,224,.32);}
+.phase .tag{position:absolute;top:10px;right:11px;font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;padding:2px 6px;border-radius:999px;}
+.phase.chain .tag{color:var(--goldText);border:1px solid rgba(201,160,92,.4);}
+.phase.crypto .tag{color:var(--cyan);border:1px solid rgba(69,212,224,.4);}
+
+/* ---- architecture ---- */
+.arch{margin-top:40px;padding:30px;border-radius:16px;background:radial-gradient(120% 100% at 50% 0%,rgba(32,74,64,.25),transparent 60%),linear-gradient(180deg,#0e1a16,#0a1210);border:1px solid rgba(69,212,224,.18);}
+.archGrid{display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:center;}
+.node{padding:18px 18px;border-radius:12px;text-align:center;background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.3);}
+.node.player{border-color:rgba(201,160,92,.35);}
+.node.relay{border-color:rgba(69,212,224,.35);background:linear-gradient(180deg,#0e1a1c,#0a1214);}
+.node .nh{font-family:var(--serif);font-size:18px;color:var(--goldText);}
+.node.relay .nh{color:#9fdfe6;}
+.node .ns{margin-top:8px;font-size:11.5px;color:var(--inkDim);line-height:1.55;}
+.archWS{text-align:center;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--cyanDim);}
+.archWS .pipe{display:block;color:rgba(69,212,224,.4);font-size:18px;letter-spacing:0;}
+.archBottom{margin-top:20px;text-align:center;padding:18px;border-radius:12px;border:1px solid rgba(201,160,92,.3);background:linear-gradient(180deg,#1c1410,#120c0a);}
+.archBottom .nh{font-family:var(--serif);font-size:18px;color:var(--goldText);}
+.archBottom .ns{margin-top:6px;font-size:11.5px;color:var(--inkDim);}
+
+/* ---- feature grid ---- */
+.fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px;}
+.feat{padding:26px 22px;border-radius:14px;background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.2);}
+.feat .fi{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:19px;margin-bottom:14px;
+  background:rgba(201,160,92,.1);border:1px solid rgba(201,160,92,.3);}
+.feat.cy .fi{background:rgba(69,212,224,.08);border-color:rgba(69,212,224,.3);}
+.feat h4{margin:0;font-family:var(--serif);font-size:19px;color:var(--ink);font-weight:600;}
+.feat p{margin:9px 0 0;font-size:13px;color:var(--inkDim);line-height:1.6;}
+
+/* ---- proof / test stats ---- */
+.proof{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:40px;}
+.pcard{padding:24px 16px;text-align:center;border-radius:13px;background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.22);}
+.pcard .pn{font-family:var(--serif);font-weight:700;font-size:34px;
+  background:linear-gradient(180deg,#f6e6bf,#cba055);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.pcard .pl{margin-top:8px;font-size:11.5px;color:var(--inkDim);line-height:1.45;letter-spacing:.02em;}
+
+/* ---- callout ---- */
+.callout{margin-top:38px;padding:26px 28px;border-radius:14px;border-left:3px solid var(--cyan);background:linear-gradient(90deg,rgba(69,212,224,.06),transparent);}
+.callout p{margin:0;font-family:var(--serif);font-style:italic;font-size:19px;line-height:1.55;color:#cde8eb;}
+
+/* ---- footer ---- */
+footer{padding:80px 24px 90px;text-align:center;border-top:1px solid rgba(201,160,92,.14);background:radial-gradient(80% 60% at 50% 100%,rgba(32,74,64,.16),transparent);}
+.stackrow{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:26px;}
+.tech{padding:7px 14px;border-radius:999px;font-size:12px;color:var(--inkDim);border:1px solid rgba(201,160,92,.22);background:rgba(201,160,92,.04);}
+.footnote{margin-top:34px;font-size:12px;color:var(--inkFaint);line-height:1.7;}
+
+/* ---- section divider ornament ---- */
+.divider{display:flex;align-items:center;justify-content:center;gap:14px;color:var(--inkFaint);font-size:13px;}
+.divider .ln{width:70px;height:1px;background:linear-gradient(90deg,transparent,rgba(201,160,92,.45));}
+.divider .ln.r{background:linear-gradient(90deg,rgba(201,160,92,.45),transparent);}
+
+/* ---- keyframes (lifted from theme.ts) ---- */
+@keyframes shimmer{0%{background-position:-180% 0}100%{background-position:280% 0}}
+@keyframes lockglow{0%,100%{opacity:.6;filter:drop-shadow(0 0 6px rgba(69,212,224,.5))}50%{opacity:1;filter:drop-shadow(0 0 16px rgba(69,212,224,.95))}}
+@keyframes potpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05);filter:drop-shadow(0 0 22px rgba(201,160,92,.45))}}
+@keyframes spotbreath{0%,100%{opacity:.9}50%{opacity:1}}
+@keyframes rise{0%{transform:translateY(16px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
+@keyframes floaty{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-10px) rotate(-4deg)}}
+
+@media (max-width:760px){
+  .cols,.cols.rev{grid-template-columns:1fr;gap:30px;}
+  .statband,.fgrid,.proof{grid-template-columns:1fr 1fr;}
+  .ways{grid-template-columns:1fr;}
+  .archGrid{grid-template-columns:1fr;}
+  .archWS .pipe{transform:rotate(90deg);}
+  section{padding:72px 0;}
+}
+</style>
+</head>
+<body>
+<div class="backdrop"></div>
+<div class="grain"></div>
+
+<!-- ============================= HERO ============================= -->
+<header class="hero">
+  <div class="spot"></div>
+  <div class="vig"></div>
+  <div class="hero-inner">
+    <span class="kicker">A Provably-Fair Card Room</span>
+    <div class="seal" style="width:112px;height:112px;margin-top:30px;">
+      <span class="dash"></span>
+      <span class="spade" style="font-size:52px;">♠</span>
+      <span class="lock" style="width:32px;height:32px;font-size:15px;">🔒</span>
+    </div>
+    <h1 class="wordmark">Sealed Deck</h1>
+    <div class="rule-row"><span class="line"></span>Heads-Up · No House<span class="line"></span></div>
+    <p class="hero-sub">Poker with no house. The deck is sealed by cryptography, the pot pays itself.</p>
+    <div class="fairtag"><span class="tick">✓</span>Provably-fair shuffle · settles on-chain on Avalanche</div>
+  </div>
+  <div class="scrollcue">Scroll<span class="arr">↓</span></div>
+</header>
+
+<!-- ============================= THE PROBLEM ============================= -->
+<section>
+  <div class="wrap reveal">
+    <span class="kicker">The Problem</span>
+    <h2 class="title">Every online card game asks you to trust the dealer.</h2>
+    <p class="body-copy">
+      When you play poker online, an invisible operator shuffles the deck, holds the money, and can see
+      every card on the table. You are trusting that the shuffle was random, that nobody is peeking at your
+      hand, and that the pot will actually be paid out. History says that trust gets abused.
+    </p>
+    <p class="body-copy">
+      In the <strong>UltimateBet &amp; Absolute Poker "superuser" scandal</strong>, insiders used god-mode
+      accounts that could see opponents' hole cards — stealing from some of the biggest names in the game,
+      for <em>years</em>, before a leaked hand history exposed play that was simply too perfect to be human.
+    </p>
+    <div class="statband">
+      <div class="panel stat bad reveal"><div class="big">$50M+</div><div class="lbl">estimated stolen from players by accounts that could see their cards</div></div>
+      <div class="panel stat bad reveal"><div class="big">~4 yrs</div><div class="lbl">the cheating ran undetected, from 2004 until a support slip-up exposed it</div></div>
+      <div class="panel stat bad reveal"><div class="big">1</div><div class="lbl">trusted operator — the single point of failure in every centralized card room</div></div>
+    </div>
+    <p class="body-copy" style="margin-top:34px;">
+      The fix isn't "trust a better operator." It's to build a game where <strong>nobody can cheat because
+      nobody holds that power</strong> — not the other player, not the server, not the people who wrote it.
+    </p>
+  </div>
+</section>
+
+<div class="divider reveal"><span class="ln"></span>♠<span class="ln r"></span></div>
+
+<!-- ============================= THE IDEA ============================= -->
+<section>
+  <div class="wrap reveal">
+    <span class="kicker">The Idea — Mental Poker, 1979</span>
+    <h2 class="title">Can two players deal a fair hand with no trusted dealer at all?</h2>
+    <p class="body-copy">
+      The question is older than the internet. In 1979, <strong>Shamir, Rivest and Adleman</strong> — the R, S
+      and A of RSA — asked whether two players who don't trust each other could play a fair game of poker
+      <em>"without using any cards and without any trusted intermediary."</em> Their answer became the founding
+      example of secure multi-party computation.
+    </p>
+    <p class="body-copy">
+      The trick is a special kind of lock. Sealed Deck builds the modern version of their protocol — two
+      browsers shuffle and encrypt a deck between themselves, settle the money on a public blockchain, and
+      a relay server in the middle never holds a key, never sees a card, and can never move a chip.
+    </p>
+    <div class="callout reveal">
+      <p>"Can two potentially dishonest players play a fair game of poker without any mutually trusted intermediary?" — Shamir, Rivest &amp; Adleman, <em>Mental Poker</em> (1979)</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= THE PADLOCK DANCE ============================= -->
+<section>
+  <div class="wrap">
+    <div class="cols">
+      <div class="reveal">
+        <span class="kicker">How — The Padlock Dance</span>
+        <h2 class="title">Two padlocks that open in any order.</h2>
+        <p class="body-copy">
+          Sealed Deck uses <strong>SRA commutative encryption</strong>. Each card is a number; each player's
+          key is an exponent applied modulo a large prime. Because exponents multiply, the order you lock and
+          unlock doesn't matter — <span class="cy">A's lock and B's lock commute</span>.
+        </p>
+        <p class="body-copy">
+          Picture a box with two padlocks. To shuffle, each player locks the whole deck with their own padlock
+          and shuffles the order. Neither can read a card, because the other's lock is still on. To deal a card
+          to one player, the <em>other</em> player simply removes their padlock — leaving exactly one lock that
+          only the owner can open.
+        </p>
+        <div class="eq reveal">
+          encrypt: <b>m → mᵉ mod p</b><br>
+          two locks: <b>(mᵉᴬ)ᵉᴮ = mᵉᴬ·ᵉᴮ = (mᵉᴮ)ᵉᴬ</b><br>
+          <span style="color:var(--inkFaint)">…so locks peel off in any order.</span>
+        </div>
+      </div>
+      <div class="reveal">
+        <div class="dance">
+          <div class="danceRow">
+            <span class="step">1</span>
+            <div class="txt"><b>Seat A</b> encrypts the whole deck with key&nbsp;A and shuffles it.</div>
+            <span class="lockpill">🔒 A</span>
+          </div>
+          <div class="danceRow">
+            <span class="step">2</span>
+            <div class="txt"><b>Seat B</b> adds key&nbsp;B on top and shuffles again. Now no one knows the order.</div>
+            <span class="lockpill">🔒 A</span><span class="lockpill">🔒 B</span>
+          </div>
+          <div class="danceRow">
+            <span class="step">3</span>
+            <div class="txt">Each card is <b>re-locked per-card</b> so individual cards can be opened selectively.</div>
+            <span class="lockpill gold">🔐 per-card</span>
+          </div>
+          <div class="danceRow">
+            <span class="step">4</span>
+            <div class="txt">To deal A's hole card, <b>B peels off B's lock</b> only. A opens the rest — privately.</div>
+            <div style="display:flex;gap:8px;">
+              <div class="locked"><div class="shim"></div><div class="pad">🔒</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= PROVABLY FAIR / COMMIT-REVEAL ============================= -->
+<section>
+  <div class="wrap">
+    <div class="cols rev">
+      <div class="reveal">
+        <div class="panel cyan" style="padding:24px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+            <span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 38% 32%,#f0d79e,#c9a05c 60%,#8a6a32);color:#0c1316;font-weight:700;font-size:13px;">✓</span>
+            <span style="font-family:var(--serif);font-size:18px;color:#9fdfe6;">Provably Fair</span>
+          </div>
+          <div style="font-size:11.5px;line-height:1.6;color:var(--inkDim);margin-bottom:16px;">
+            Each player commits <code class="cy">keccak256(seed)</code> on-chain <em>before</em> any card moves,
+            so neither can re-pick their shuffle after seeing the other's deck.
+          </div>
+          <div style="padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(69,212,224,.15);margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <span style="font-size:12px;color:var(--ink);">Seat 0 · 0x4a…b21c</span>
+              <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid rgba(69,212,224,.5);background:rgba(69,212,224,.1);color:var(--cyan);">Committed</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--cyanDim);padding:2px 0;"><span style="text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);font-size:9px;color:var(--inkDim);">commit</span><span>0x9f3a…c7e1…</span></div>
+            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--cyanDim);padding:2px 0;"><span style="text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);font-size:9px;color:var(--inkDim);">seed</span><span>sealed until showdown</span></div>
+          </div>
+          <div style="padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(69,212,224,.15);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <span style="font-size:12px;color:var(--ink);">Seat 1 · 0x8d…f09a</span>
+              <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid rgba(69,212,224,.5);background:rgba(69,212,224,.1);color:var(--cyan);">Hash verified ✓</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--cyanDim);padding:2px 0;"><span style="text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);font-size:9px;color:var(--inkDim);">commit</span><span>0x21bd…4af0…</span></div>
+            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--cyanDim);padding:2px 0;"><span style="text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);font-size:9px;color:var(--inkDim);">seed</span><span>0x21bd…4af0…</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="reveal">
+        <span class="kicker">The Other Half — Commit / Reveal</span>
+        <h2 class="title">Lock the shuffle in before any card is seen.</h2>
+        <p class="body-copy">
+          Encryption keeps cards <em>secret</em>. A second mechanism keeps the shuffle <em>honest</em>. Before
+          a single card is dealt, each player publishes <code class="cy">keccak256(seed)</code> — a fingerprint
+          of their shuffle randomness — directly to the smart contract.
+        </p>
+        <p class="body-copy">
+          Because the fingerprint is locked in first, nobody can change their shuffle after peeking at the
+          opponent's. At showdown, both players reveal their seeds and the contract checks
+          <code class="cy">keccak256(seed) == commitment</code> — the exact same check anyone can rerun. The
+          deal was fair, and you can prove it.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider reveal"><span class="ln"></span>♦<span class="ln r"></span></div>
+
+<!-- ============================= THE POT PAYS ITSELF ============================= -->
+<section>
+  <div class="wrap reveal">
+    <span class="kicker">The Money — Trustless Custody</span>
+    <h2 class="title">No house holds the pot. The contract does.</h2>
+    <p class="body-copy">
+      Both players stake their buy-in into a <code class="gd">PokerTable</code> smart contract on the
+      Avalanche Fuji C-Chain. From that moment the chips are governed by code, not by an operator. The pot
+      can move only four ways — and <strong>no single player can ever claim it unilaterally</strong>.
+    </p>
+    <div class="ways">
+      <div class="way reveal"><span class="ic">🤝</span><div class="num">WAY Ⅰ</div><h4>Cooperative settle</h4><p>Both players sign an EIP-712 <code>Settlement</code> agreeing on the winner and pot. The contract verifies <em>both</em> signatures match the two seats, then pays out. Neither can settle alone.</p></div>
+      <div class="way reveal"><span class="ic">🃏</span><div class="num">WAY Ⅱ</div><h4>Fold</h4><p>If a player folds, their opponent takes the pot immediately. The simplest, most common path — fully on-chain.</p></div>
+      <div class="way reveal"><span class="ic">⏱️</span><div class="num">WAY Ⅲ</div><h4>Timeout slash</h4><p>If a player stalls past <code>N</code> blocks, the other calls <code>claimTimeout</code>. The delinquent forfeits their entire stake to the honest player. The table can never freeze.</p></div>
+      <div class="way reveal"><span class="ic">↩️</span><div class="num">WAY Ⅳ</div><h4>Dispute void</h4><p>If both reveal but never agree on a signed winner, either may <code>voidAndRefund</code> after the deadline — each gets back exactly their own contribution. A griefer can force a void but can <em>never steal</em>.</p></div>
+    </div>
+    <p class="body-copy" style="margin-top:34px;">
+      The guarantee that matters: <strong>an honest player always recovers their funds</strong> — worst case,
+      they win by waiting out a timeout, or get fully refunded by a void. The relay server signs nothing and
+      holds no key; it can never touch the money.
+    </p>
+  </div>
+</section>
+
+<!-- ============================= x402 BUY-IN ============================= -->
+<section>
+  <div class="wrap reveal">
+    <span class="kicker">Buy-in — x402 on Avalanche</span>
+    <h2 class="title">Pay the table in USDC, gaslessly.</h2>
+    <p class="body-copy">
+      The default table runs on native <strong>AVAX</strong>. An optional path lets players buy in with
+      Avalanche-native Circle <strong>USDC</strong> over the <code class="gd">x402</code> HTTP-402 payment
+      standard. The buy-in is an <code class="cy">EIP-3009 transferWithAuthorization</code> the player signs
+      off-chain — no gas, no pre-approval — and the contract's
+      <code class="gd">joinWithAuthorization</code> settles it straight into the pot.
+    </p>
+    <div class="fgrid">
+      <div class="feat cy reveal"><div class="fi">✍️</div><h4>Sign, don't spend</h4><p>The player signs a payment authorization as an <code>X-PAYMENT</code> header. No upfront gas, no approve transaction.</p></div>
+      <div class="feat reveal"><div class="fi">🏦</div><h4>Straight to the table</h4><p>The authorization's recipient <em>is</em> the table contract — the x402 settlement primitive funds the pot directly.</p></div>
+      <div class="feat cy reveal"><div class="fi">💵</div><h4>Real USDC, USDC payout</h4><p>Native Circle USDC on Fuji, the same EIP-3009 token used by Avalanche x402 facilitators. The whole pot pays out in USDC.</p></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider reveal"><span class="ln"></span>♣<span class="ln r"></span></div>
+
+<!-- ============================= HAND LIFECYCLE ============================= -->
+<section>
+  <div class="wrap reveal">
+    <span class="kicker">The Lifecycle — One Hand</span>
+    <h2 class="title">From empty table to settled pot.</h2>
+    <p class="body-copy">
+      Each phase is a strict, illegal-transition-proof state machine. Money and turn order are truth
+      <span class="gd">on-chain</span>; the card protocol runs <span class="cy">peer-to-peer over WebSocket</span>.
+    </p>
+    <div class="flow">
+      <div class="phase chain reveal"><span class="tag">chain</span><div class="ph-i">🪑</div><div class="ph-n">Join</div><div class="ph-d">Both stake the buy-in &amp; take a seat.</div></div>
+      <div class="phase chain reveal"><span class="tag">chain</span><div class="ph-i">🔒</div><div class="ph-n">Commit</div><div class="ph-d">Each posts keccak256(seed).</div></div>
+      <div class="phase crypto reveal"><span class="tag">crypto</span><div class="ph-i">♻️</div><div class="ph-n">Shuffle</div><div class="ph-d">The padlock dance over WS.</div></div>
+      <div class="phase crypto reveal"><span class="tag">crypto</span><div class="ph-i">🤲</div><div class="ph-n">Deal</div><div class="ph-d">Reveal shares → sealed hole cards.</div></div>
+      <div class="phase chain reveal"><span class="tag">chain</span><div class="ph-i">💰</div><div class="ph-n">Bet</div><div class="ph-d">Preflop → flop → turn → river.</div></div>
+      <div class="phase chain reveal"><span class="tag">chain</span><div class="ph-i">🏆</div><div class="ph-n">Showdown</div><div class="ph-d">Reveal seeds, sign, settle. Snowtrace.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= ARCHITECTURE ============================= -->
+<section>
+  <div class="wrap reveal">
+    <span class="kicker">The Shape Of It — Architecture</span>
+    <h2 class="title">Two browsers, a keyless relay, and a chain.</h2>
+    <div class="arch reveal">
+      <div class="archGrid">
+        <div class="node player">
+          <div class="nh">Player A</div>
+          <div class="ns">browser · wagmi + SRA crypto · holds their own keys &amp; cards</div>
+        </div>
+        <div class="archWS">
+          encrypted<br>card blobs
+          <span class="pipe">⇆</span>
+          never cleartext
+        </div>
+        <div class="node player">
+          <div class="nh">Player B</div>
+          <div class="ns">browser · wagmi + SRA crypto · holds their own keys &amp; cards</div>
+        </div>
+      </div>
+      <div style="text-align:center;margin:18px 0;color:rgba(69,212,224,.45);font-size:20px;">↑ &nbsp; ↑</div>
+      <div class="node relay" style="max-width:520px;margin:0 auto;">
+        <div class="nh">Relay / Coordinator</div>
+        <div class="ns">Node · WebSocket relay + per-hand FSM + chain watcher + x402 buy-in route<br><strong style="color:var(--cyan)">holds no key · signs nothing · sees no card</strong></div>
+      </div>
+      <div class="archBottom">
+        <div class="nh">PokerTable contract @ Avalanche Fuji C-Chain (43113)</div>
+        <div class="ns">pot custody · betting accounting · commit/reveal · dual-signed settlement · timeout slash · verified on Snowtrace</div>
+      </div>
+    </div>
+    <p class="body-copy" style="margin-top:30px;">
+      The relay exists only for liveness and coordination. Hole-card reveal shares are forwarded to one
+      recipient only, so the server never holds both locks on a private card. <strong>Card secrecy lives in the
+      browsers; money truth lives on the chain.</strong> The middle is powerless by design.
+    </p>
+  </div>
+</section>
+
+<div class="divider reveal"><span class="ln"></span>♥<span class="ln r"></span></div>
+
+<!-- ============================= PROOF ============================= -->
+<section>
+  <div class="wrap reveal">
+    <span class="kicker">Not Just Claims — It's Tested</span>
+    <h2 class="title">The hard parts are proven in isolation.</h2>
+    <div class="proof">
+      <div class="pcard reveal"><div class="pn">21</div><div class="pl">Foundry tests<br>AVAX PokerTable: join, bet, settle, timeout, void</div></div>
+      <div class="pcard reveal"><div class="pn">5</div><div class="pl">Foundry tests<br>USDC / x402 EIP-3009 buy-in contract</div></div>
+      <div class="pcard reveal"><div class="pn">13</div><div class="pl">Vitest crypto tests<br>commutativity, round-trip, hole-card secrecy, seeded shuffle</div></div>
+      <div class="pcard reveal"><div class="pn">∞</div><div class="pl">re-verifiable<br>anyone can recheck keccak256(seed)==commit</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= FEATURES SUMMARY ============================= -->
+<section>
+  <div class="wrap reveal">
+    <span class="kicker">Why It's Different</span>
+    <h2 class="title">No house edge. No trusted shuffle. No peeking.</h2>
+    <div class="fgrid">
+      <div class="feat reveal"><div class="fi">♠</div><h4>No house</h4><p>There is no operator taking a rake or holding the pot. Two players, a contract, and a powerless relay.</p></div>
+      <div class="feat cy reveal"><div class="fi">🔒</div><h4>No one can peek</h4><p>SRA commutative encryption means a private card carries two locks — neither player nor the server ever holds both.</p></div>
+      <div class="feat reveal"><div class="fi">🎲</div><h4>Provably-fair deal</h4><p>Commit-reveal binds the shuffle before any card moves, then proves it after — the same check anyone can rerun.</p></div>
+      <div class="feat cy reveal"><div class="fi">⛓️</div><h4>The pot pays itself</h4><p>Settlement is dual-signed and on-chain; an honest player always recovers their funds, worst case by timeout.</p></div>
+      <div class="feat reveal"><div class="fi">🛡️</div><h4>Can't be frozen</h4><p>A timeout slash guarantees a staller forfeits their stake — the game can never deadlock with your money inside.</p></div>
+      <div class="feat cy reveal"><div class="fi">🔍</div><h4>Verify everything</h4><p>Every settlement is a transaction you can open on Snowtrace. Trust is replaced by a link.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= FOOTER ============================= -->
+<footer>
+  <div class="wrap">
+    <div class="seal" style="width:80px;height:80px;margin:0 auto;">
+      <span class="dash"></span>
+      <span class="spade" style="font-size:38px;">♠</span>
+      <span class="lock" style="width:24px;height:24px;font-size:11px;">🔒</span>
+    </div>
+    <h2 class="title" style="font-size:34px;margin-top:24px;">Sealed Deck</h2>
+    <p class="lede" style="margin:14px auto 0;text-align:center;">Trustless heads-up poker on Avalanche. The deck is sealed by cryptography, the pot pays itself.</p>
+    <div class="stackrow">
+      <span class="tech">Solidity · Foundry</span>
+      <span class="tech">SRA mental poker</span>
+      <span class="tech">React · Vite · wagmi/viem</span>
+      <span class="tech">Node · WebSocket relay</span>
+      <span class="tech">x402 · EIP-3009 USDC</span>
+      <span class="tech">EIP-712 settlement</span>
+      <span class="tech">Avalanche Fuji C-Chain</span>
+    </div>
+    <p class="footnote">
+      Built for an Avalanche hackathon · Heads-up, one hand per contract instance · Fairness via commit-reveal + SRA commutative encryption.<br>
+      Sources: <a href="https://en.wikipedia.org/wiki/Mental_poker">Mental Poker (Shamir, Rivest &amp; Adleman, 1979)</a> · <a href="https://upswingpoker.com/ultimate-bet-absolute-poker-scandal/">UltimateBet &amp; Absolute Poker superuser scandal</a>
+    </p>
+  </div>
+</footer>
+
+<script>
+// scroll-reveal
+const io = new IntersectionObserver((entries)=>{
+  for(const e of entries){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }
+},{threshold:.12, rootMargin:'0px 0px -8% 0px'});
+document.querySelectorAll('.reveal').forEach((el,i)=>{
+  // small stagger for grids
+  el.style.transitionDelay = (Math.min(i%4,3)*60)+'ms';
+  io.observe(el);
+});
+</script>
+</body>
+</html>
