@@ -134,8 +134,3 @@ frontend/       React/Vite UI
 
 ---
 
-## Known limitations
-
-- No on-chain card evaluation — disputes resolve via timeout/void, not by reconstructing hands on-chain (ZK shuffle is out of scope)
-- SRA uses the 1024-bit RFC 2409 prime for speed; production would use the 2048-bit RFC 3526 prime
-- x402 facilitator hop on Fuji is the only piece not exercised offline; contract + server paths are fully tested
