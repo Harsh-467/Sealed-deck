@@ -65,9 +65,12 @@ export function CardFace({
   const big = Math.round(w * 0.64);
   const pip = Math.round(w * 0.3);
   const rk = Math.round(w * 0.3);
+  // `rank` is pokersolver shorthand (Ten = "T"); show the human label on the face.
+  const rankLabel = v.rank === 'T' ? '10' : v.rank;
+  const rankSize = rankLabel.length > 1 ? Math.round(rk * 0.82) : rk;
   return (
     <div
-      title={`${v.rank} of ${v.suitName}`}
+      title={`${rankLabel} of ${v.suitName}`}
       style={{
         position: 'relative',
         width: w,
@@ -85,12 +88,12 @@ export function CardFace({
       }}
     >
       <span style={{ position: 'absolute', top: 4, left: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 0.85, color: suit.color }}>
-        <span style={{ fontSize: rk, fontWeight: 600 }}>{v.rank}</span>
+        <span style={{ fontSize: rankSize, fontWeight: 600 }}>{rankLabel}</span>
         <span style={{ fontSize: pip }}>{suit.sym}</span>
       </span>
       <span style={{ fontSize: big, color: suit.color }}>{suit.sym}</span>
       <span style={{ position: 'absolute', bottom: 4, right: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 0.85, color: suit.color, transform: 'rotate(180deg)' }}>
-        <span style={{ fontSize: rk, fontWeight: 600 }}>{v.rank}</span>
+        <span style={{ fontSize: rankSize, fontWeight: 600 }}>{rankLabel}</span>
         <span style={{ fontSize: pip }}>{suit.sym}</span>
       </span>
     </div>

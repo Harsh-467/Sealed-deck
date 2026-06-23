@@ -3,578 +3,664 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Sealed Deck — How trustless poker works</title>
+<title>Sealed Deck — Deck</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,600;0,6..96,700;0,6..96,800;0,6..96,900;1,6..96,500&family=Archivo:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,600;0,6..96,700;0,6..96,800;0,6..96,900;1,6..96,500;1,6..96,600&family=Archivo:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
 :root{
-  --bg:#0c0807; --ink:#ece3d2; --inkDim:#9a8f7e; --inkFaint:#7c715f;
-  --gold:#c9a05c; --goldLt:#f6e6bf; --goldMd:#dcb978; --goldDk:#a87e3c; --goldText:#e7cf9b; --potText:#f3e1b4;
+  --bg:#0c0807; --bg2:#0a0605; --ink:#ece3d2; --inkDim:#9a8f7e; --inkFaint:#7c715f;
+  --gold:#c9a05c; --goldLt:#f6e6bf; --goldMd:#dcb978; --goldDk:#a87e3c; --goldText:#e7cf9b;
   --cyan:#45d4e0; --cyanDim:#7fb8bf; --cyanGlow:rgba(69,212,224,.5);
-  --felt0:#204a40; --felt1:#173329; --felt2:#0e2019;
   --avax:#e84142; --cardRed:#b3403a; --cardBlack:#2a2118;
   --serif:'Bodoni Moda',serif; --sans:'Archivo',sans-serif; --mono:'JetBrains Mono',monospace;
 }
 *{box-sizing:border-box;}
-html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);scroll-behavior:smooth;-webkit-font-smoothing:antialiased;}
-body{overflow-x:hidden;}
+html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow:hidden;}
 ::selection{background:rgba(201,160,92,.3);color:#f3e8d0;}
-a{color:var(--cyanDim);text-decoration:none;}
-a:hover{color:var(--cyan);}
-code,.mono{font-family:var(--mono);}
+a{color:var(--cyanDim);text-decoration:none;}a:hover{color:var(--cyan);}
+code{font-family:var(--mono);font-size:.92em;}
+.ic{width:1em;height:1em;display:inline-block;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.12em;}
 
-/* ---- ambient felt + vignette ---- */
-.backdrop{position:fixed;inset:0;z-index:-2;
-  background:
-    radial-gradient(120% 80% at 50% -10%, rgba(201,160,92,.07), transparent 55%),
-    radial-gradient(90% 70% at 50% 110%, rgba(32,74,64,.18), transparent 60%),
-    var(--bg);}
-.grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.04;
-  background-image:radial-gradient(rgba(255,255,255,.6) .5px, transparent .5px);background-size:3px 3px;}
+/* ambient */
+.backdrop{position:fixed;inset:0;z-index:-3;background:radial-gradient(120% 90% at 50% -15%,rgba(201,160,92,.08),transparent 52%),radial-gradient(100% 80% at 50% 118%,rgba(32,74,64,.2),transparent 60%),linear-gradient(180deg,var(--bg),var(--bg2));}
+.mesh{position:fixed;inset:-20%;z-index:-2;pointer-events:none;opacity:.5;background:radial-gradient(36% 40% at 18% 22%,rgba(69,212,224,.07),transparent 60%),radial-gradient(40% 44% at 82% 70%,rgba(201,160,92,.07),transparent 60%);animation:meshdrift 22s ease-in-out infinite alternate;}
+.grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.045;background-image:radial-gradient(rgba(255,255,255,.7) .5px,transparent .5px);background-size:3px 3px;}
+.spotlight{position:fixed;width:560px;height:560px;left:0;top:0;z-index:0;pointer-events:none;border-radius:50%;transform:translate(-50%,-50%);mix-blend-mode:screen;opacity:.5;background:radial-gradient(circle,rgba(201,160,92,.15),rgba(201,160,92,.05) 38%,transparent 66%);}
 
-/* ---- layout ---- */
-.wrap{max-width:1080px;margin:0 auto;padding:0 24px;}
-section{position:relative;padding:96px 0;}
-.kicker{display:inline-flex;align-items:center;gap:12px;color:var(--inkDim);font-size:11px;letter-spacing:.42em;text-transform:uppercase;}
-.kicker::before,.kicker::after{content:"";width:34px;height:1px;}
-.kicker::before{background:linear-gradient(90deg,transparent,var(--gold));}
-.kicker::after{background:linear-gradient(90deg,var(--gold),transparent);}
-h2.title{font-family:var(--serif);font-weight:800;font-size:clamp(30px,5vw,52px);line-height:1.02;letter-spacing:.01em;margin:18px 0 0;
-  background:linear-gradient(180deg,#f6e6bf,#dcb978 48%,#a87e3c);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
-.lede{max-width:640px;margin:20px 0 0;font-family:var(--serif);font-style:italic;font-size:21px;line-height:1.55;color:#cabfa9;}
-.body-copy{max-width:660px;color:var(--inkDim);font-size:15.5px;line-height:1.75;margin:18px 0 0;}
-.body-copy strong{color:var(--ink);font-weight:600;}
+/* ============ DECK ============ */
+.deck{position:fixed;inset:0;overflow:hidden;}
+.track{display:flex;height:100%;width:100%;transition:transform .7s cubic-bezier(.7,0,.18,1);will-change:transform;}
+.slide{flex:0 0 100vw;height:100vh;display:grid;place-items:center;padding:clamp(40px,7vh,84px) clamp(30px,6vw,100px);overflow:hidden;position:relative;}
+.s-inner{width:100%;max-width:1120px;max-height:100%;}
+
+/* slide intro anim */
+.slide .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.16,.8,.27,1),transform .7s cubic-bezier(.16,.8,.27,1);}
+.slide.active .reveal.in{opacity:1;transform:none;}
+
+/* shared bits */
+.eyebrow{display:flex;align-items:center;gap:13px;font-family:var(--mono);font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--inkFaint);}
+.eyebrow .idx{color:var(--gold);}.eyebrow .sx{color:rgba(201,160,92,.5);font-size:13px;}
+.eyebrow .ln{flex:1;height:1px;max-width:130px;background:linear-gradient(90deg,rgba(201,160,92,.5),transparent);}
+h2.title{font-family:var(--serif);font-weight:800;font-size:clamp(28px,4.2vw,50px);line-height:1.02;margin:16px 0 0;max-width:16ch;
+  background:linear-gradient(176deg,#fbf0d6,#dcb978 46%,#a87e3c);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+h2.title.wide{max-width:22ch;}
+.lede{max-width:680px;margin:18px 0 0;font-family:var(--serif);font-style:italic;font-weight:500;font-size:clamp(16px,1.9vw,21px);line-height:1.5;color:#cdc2ab;}
+.copy{max-width:680px;color:var(--inkDim);font-size:clamp(13px,1.15vw,15px);line-height:1.7;margin:14px 0 0;}
+.copy.tight{margin-top:9px;}.copy strong{color:var(--ink);font-weight:600;}
 .cy{color:var(--cyanDim);}.gd{color:var(--goldText);}
 
-/* ---- the brass seal emblem ---- */
-.seal{position:relative;display:grid;place-items:center;border-radius:50%;
-  background:radial-gradient(circle at 38% 30%,#f3dca4,#c9a05c 44%,#7d5f2c 100%);
-  box-shadow:inset 0 2px 4px rgba(255,248,224,.85),inset 0 -6px 14px rgba(50,32,8,.75),0 10px 34px rgba(0,0,0,.6),0 0 0 7px rgba(201,160,92,.08);
-  border:1px solid rgba(120,90,40,.8);}
-.seal .dash{position:absolute;inset:8px;border-radius:50%;border:1.5px dashed rgba(70,48,18,.5);}
+/* seal */
+.seal{position:relative;display:grid;place-items:center;border-radius:50%;background:radial-gradient(circle at 38% 30%,#f3dca4,#c9a05c 44%,#7d5f2c 100%);box-shadow:inset 0 2px 4px rgba(255,248,224,.85),inset 0 -6px 14px rgba(50,32,8,.75),0 12px 40px rgba(0,0,0,.6),0 0 0 7px rgba(201,160,92,.07);border:1px solid rgba(120,90,40,.8);}
+.seal .dash{position:absolute;inset:8px;border-radius:50%;border:1.5px dashed rgba(70,48,18,.5);animation:spin 26s linear infinite;}
 .seal .spade{font-family:var(--serif);color:#3a2a12;line-height:1;}
-.seal .lock{position:absolute;right:4px;bottom:4px;border-radius:50%;background:#0c1316;display:grid;place-items:center;
-  border:1.5px solid rgba(69,212,224,.55);box-shadow:0 0 14px rgba(69,212,224,.55),inset 0 0 8px rgba(69,212,224,.25);color:var(--cyan);
-  animation:lockglow 2.6s ease-in-out infinite;}
+.seal .lock{position:absolute;right:2px;bottom:2px;display:grid;place-items:center;border-radius:50%;background:#0c1316;color:var(--cyan);border:1.5px solid rgba(69,212,224,.55);box-shadow:0 0 14px rgba(69,212,224,.55),inset 0 0 8px rgba(69,212,224,.25);animation:lockglow 2.6s ease-in-out infinite;}
 
-/* ---- HERO ---- */
-.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 24px;}
-.hero .spot{pointer-events:none;position:absolute;inset:0;background:radial-gradient(60% 50% at 50% 42%,rgba(201,160,92,.12),rgba(201,160,92,.03) 40%,transparent 70%);animation:spotbreath 6s ease-in-out infinite;}
-.hero .vig{pointer-events:none;position:absolute;inset:0;background:radial-gradient(75% 70% at 50% 45%,transparent 48%,rgba(6,4,4,.85));}
-.hero-inner{position:relative;animation:rise .9s ease both;display:flex;flex-direction:column;align-items:center;}
-.wordmark{margin:26px 0 0;font-family:var(--serif);font-weight:800;font-size:clamp(56px,12vw,108px);line-height:.9;letter-spacing:.02em;text-transform:uppercase;
-  background:linear-gradient(180deg,#f6e6bf 0%,#dcb978 42%,#a87e3c 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 2px 10px rgba(0,0,0,.5));}
-.rule-row{margin-top:12px;display:flex;align-items:center;gap:16px;color:var(--inkFaint);font-size:11px;letter-spacing:.5em;text-transform:uppercase;}
-.rule-row span.line{width:50px;height:1px;background:rgba(201,160,92,.4);}
-.hero-sub{max-width:600px;margin:34px 0 0;font-family:var(--serif);font-style:italic;font-weight:500;font-size:clamp(19px,2.4vw,25px);line-height:1.5;color:#cabfa9;}
-.fairtag{margin-top:28px;display:flex;align-items:center;gap:11px;color:var(--cyanDim);font-size:12.5px;letter-spacing:.06em;}
-.fairtag .tick{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;border:1px solid rgba(69,212,224,.5);background:rgba(69,212,224,.08);color:var(--cyan);font-size:11px;}
-.scrollcue{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);color:var(--inkFaint);font-size:10px;letter-spacing:.4em;text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:8px;animation:spotbreath 3s ease-in-out infinite;}
-.scrollcue .arr{font-size:14px;animation:nudge 1.8s ease-in-out infinite;}
+/* TITLE slide */
+.title-slide{text-align:center;}
+.title-slide .kick{display:inline-flex;align-items:center;gap:13px;font-family:var(--mono);font-size:11px;letter-spacing:.4em;text-transform:uppercase;color:var(--inkDim);}
+.title-slide .kick .ln{width:38px;height:1px;background:linear-gradient(90deg,transparent,var(--gold));}
+.title-slide .kick .ln.r{background:linear-gradient(90deg,var(--gold),transparent);}
+/* wrapper holds the layout + soft shadow; the gradient-clipped text lives on its OWN child
+   (filter on a background-clip:text element makes the fill vanish in Chrome — keep them apart) */
+.wordmark{position:relative;display:inline-block;margin:24px 0 0;font-family:var(--serif);font-weight:800;font-size:clamp(46px,10vw,112px);line-height:.86;letter-spacing:.012em;text-transform:uppercase;white-space:nowrap;filter:drop-shadow(0 4px 22px rgba(0,0,0,.55));}
+.wordmark .wm-base{display:inline-block;color:transparent;background:linear-gradient(180deg,#fbf0d6,#e6c98c 38%,#a87e3c);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.wordmark .wm-sheen{position:absolute;left:0;top:0;color:transparent;background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.55) 50%,transparent 62%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;background-size:220% 100%;animation:sheen 4s ease-in-out 1s 2 forwards;}
+.rulerow{margin-top:20px;display:flex;align-items:center;justify-content:center;gap:18px;color:var(--inkFaint);font-size:11px;letter-spacing:.5em;text-transform:uppercase;}
+.rulerow .l{width:54px;height:1px;background:rgba(201,160,92,.4);}
+.hero-sub{max-width:560px;margin:28px auto 0;font-family:var(--serif);font-style:italic;font-weight:500;font-size:clamp(18px,2.4vw,25px);line-height:1.5;color:#cfc4ad;}
+.fairtag{margin-top:26px;display:inline-flex;align-items:center;gap:11px;color:var(--cyanDim);font-size:12.5px;}
+.fairtag .tick{display:grid;place-items:center;width:21px;height:21px;border-radius:50%;border:1px solid rgba(69,212,224,.5);background:rgba(69,212,224,.08);color:var(--cyan);}
+.title-stage{position:relative;perspective:1100px;}
+.floatcards{position:absolute;inset:0;pointer-events:none;}
+.fc{position:absolute;left:50%;top:50%;opacity:0;transition:transform 1.1s cubic-bezier(.5,0,.2,1),opacity .7s ease;}
+.fc-in{will-change:transform;}
+.floatcards.show .fc{opacity:1;}
+.floatcards.show .fc2{transition-delay:0s,.07s;}
+.floatcards.show .fc3{transition-delay:0s,.14s;}
+.floatcards.show .fc4{transition-delay:0s,.21s;}
+/* final spread positions — pushed to the screen corners (vw/vh) so they clear the text */
+.fc1{transform:translate(-44vw,-36vh) rotate(-15deg);}.fc2{transform:translate(44vw,-36vh) rotate(14deg);}
+.fc3{transform:translate(-44vw,36vh) rotate(11deg);}.fc4{transform:translate(44vw,36vh) rotate(-12deg);}
+/* keep the headline + text strictly above the cards so they're never hidden */
+.title-slide .s-inner > .reveal{position:relative;z-index:2;}
+.title-slide .floatcards{z-index:1;}
+/* gathered intro fan (centre) */
+.floatcards.gathered .fc1{transform:translate(-95%,-50%) rotate(-13deg);}
+.floatcards.gathered .fc2{transform:translate(-66%,-55%) rotate(-4.5deg);}
+.floatcards.gathered .fc3{transform:translate(-34%,-55%) rotate(4.5deg);}
+.floatcards.gathered .fc4{transform:translate(-5%,-50%) rotate(13deg);}
+@media (max-width:980px){.floatcards{display:none;}}
 
-/* ---- reveal on scroll ---- */
-.reveal{opacity:0;transform:translateY(26px);transition:opacity .7s ease,transform .7s ease;}
-.reveal.in{opacity:1;transform:none;}
+/* PROBLEM dossier */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;}
+.dossier{border:1px solid rgba(201,160,92,.26);border-radius:16px;overflow:hidden;background:linear-gradient(180deg,rgba(36,22,18,.7),rgba(18,11,9,.7));position:relative;}
+.dossier::before{content:"ON RECORD";position:absolute;top:12px;right:16px;font-family:var(--mono);font-size:9.5px;letter-spacing:.26em;color:rgba(232,65,66,.7);border:1px solid rgba(232,65,66,.35);padding:3px 8px;border-radius:5px;}
+.dcell{padding:26px 24px;border-bottom:1px solid rgba(201,160,92,.14);}.dcell:last-child{border-bottom:0;}
+.dcell .tagline{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--inkFaint);}
+.dcell .fig{margin-top:8px;font-family:var(--serif);font-weight:700;font-size:clamp(30px,4vw,42px);line-height:1;background:linear-gradient(180deg,#f6a3a3,#e84142);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.dcell.g .fig{background:linear-gradient(180deg,#f6e6bf,#cba055);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.dcell .cap{margin-top:8px;font-size:12px;color:var(--inkDim);line-height:1.5;}
+.pullquote{margin-top:18px;padding:22px 26px;border-left:3px solid var(--gold);background:linear-gradient(90deg,rgba(201,160,92,.07),transparent);border-radius:0 12px 12px 0;}
+.pullquote p{margin:0;font-family:var(--serif);font-style:italic;font-size:clamp(17px,2vw,22px);line-height:1.45;color:#ecdfc4;}
+.pullquote .src{margin-top:11px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--inkFaint);}
 
-/* ---- generic panel ---- */
-.panel{background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.28);border-radius:14px;}
-.panel.cyan{background:linear-gradient(180deg,#0e1a1c,#0a1214);border-color:rgba(69,212,224,.3);}
+/* PADLOCK DANCE demo */
+.demo{position:relative;border-radius:20px;padding:34px 28px 26px;background:radial-gradient(120% 100% at 50% 0%,rgba(32,74,64,.32),transparent 60%),linear-gradient(180deg,#0e1a16,#0a1210);border:1px solid rgba(69,212,224,.2);box-shadow:0 30px 80px rgba(0,0,0,.5);}
+.demo .felt-ring{position:absolute;inset:16px;border-radius:14px;border:1px solid rgba(69,212,224,.08);pointer-events:none;}
+.deckrow{display:flex;justify-content:center;gap:11px;perspective:900px;min-height:110px;align-items:center;}
+.dcard{position:relative;width:62px;height:88px;border-radius:8px;flex:none;transform-style:preserve-3d;transition:transform .6s cubic-bezier(.4,1.3,.4,1);}
+.dcard .face,.dcard .back{position:absolute;inset:0;border-radius:8px;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden;}
+.dcard .back{background:repeating-linear-gradient(45deg,#2a1013 0 7px,#1d0b0d 7px 14px);border:1.5px solid rgba(120,80,60,.4);box-shadow:0 7px 16px rgba(0,0,0,.5);}
+.dcard .back .pat{position:absolute;inset:6px;border-radius:5px;border:1px solid rgba(201,160,92,.18);}
+.dcard .face{transform:rotateY(180deg);background:linear-gradient(162deg,#f8f2e6,#e9ddc5);border:1px solid #cdbd9a;display:grid;place-items:center;font-family:var(--serif);}
+.dcard .face .big{font-size:38px;}
+.dcard .face .cn{position:absolute;top:5px;left:6px;display:flex;flex-direction:column;align-items:center;line-height:.82;}
+.dcard .face .cn .rk{font-size:16px;font-weight:600;}
+.dcard.red .big,.dcard .face.red,.face.red .big{color:var(--cardRed);}.face.black,.face.black .big{color:var(--cardBlack);}
+.dcard .lk{position:absolute;inset:0;border-radius:8px;display:grid;place-items:center;opacity:0;transition:opacity .45s,transform .55s;z-index:2;}
+.dcard .lk svg{width:23px;height:23px;}
+.dcard .lkA{background:linear-gradient(160deg,rgba(69,212,224,.16),rgba(69,212,224,.05));border:1.5px solid rgba(69,212,224,.45);color:var(--cyan);}
+.dcard .lkB{background:linear-gradient(160deg,rgba(201,160,92,.18),rgba(201,160,92,.05));border:1.5px solid rgba(201,160,92,.5);color:var(--goldText);}
+.dcard .shim{position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(69,212,224,.25) 50%,transparent 65%);background-size:220% 100%;mix-blend-mode:screen;opacity:0;animation:shimmer 2.4s linear infinite;z-index:3;}
+.demo[data-stage="lockA"] .lkA,.demo[data-stage="shuffleA"] .lkA,.demo[data-stage="lockB"] .lkA,.demo[data-stage="shuffleB"] .lkA,.demo[data-stage="peel"] .lkA,.demo[data-stage="reveal"] .lkA{opacity:1;}
+.demo[data-stage="lockB"] .lkB,.demo[data-stage="shuffleB"] .lkB{opacity:1;}
+.demo[data-stage="lockA"] .shim,.demo[data-stage="lockB"] .shim{opacity:1;}
+.demo[data-stage="peel"] .hero-card .lkB{opacity:0;transform:translateY(-52px) rotate(14deg) scale(.9);}
+.demo[data-stage="reveal"] .hero-card .lkA{opacity:0;}
+.demo[data-stage="reveal"] .hero-card.dcard{transform:rotateY(180deg);}
+.shuffling .dcard{animation:riffle .62s cubic-bezier(.5,0,.4,1);}
+.shuffling .dcard:nth-child(2){animation-delay:.04s}.shuffling .dcard:nth-child(3){animation-delay:.08s}.shuffling .dcard:nth-child(4){animation-delay:.12s}.shuffling .dcard:nth-child(5){animation-delay:.16s}
+.demo .cap{margin-top:22px;text-align:center;min-height:40px;font-family:var(--serif);font-style:italic;font-size:15px;color:#bfe6ea;line-height:1.4;transition:opacity .3s;}
+.demo .dots{margin-top:13px;display:flex;justify-content:center;gap:7px;}
+.demo .dot{width:7px;height:7px;border-radius:50%;background:rgba(127,184,191,.25);transition:all .3s;}
+.demo .dot.on{background:var(--cyan);box-shadow:0 0 10px var(--cyanGlow);transform:scale(1.25);}
+.demo .stagelbl{position:absolute;top:14px;left:18px;font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--cyanDim);}
+.eqbox{display:inline-block;margin-top:20px;padding:16px 20px;border-radius:12px;font-family:var(--mono);font-size:13px;color:var(--cyanDim);line-height:1.85;background:rgba(69,212,224,.045);border:1px solid rgba(69,212,224,.2);}
+.eqbox b{color:var(--cyan);font-weight:500;}.eqbox .mut{color:var(--inkFaint);}
 
-/* ---- problem stat band ---- */
-.statband{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:42px;}
-.stat{padding:26px 22px;text-align:center;}
-.stat .big{font-family:var(--serif);font-weight:700;font-size:40px;line-height:1;
-  background:linear-gradient(180deg,#f6e6bf,#cba055);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
-.stat .lbl{margin-top:10px;font-size:12px;color:var(--inkDim);line-height:1.5;}
-.stat.bad .big{background:linear-gradient(180deg,#f3a3a3,#e84142);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+/* FAIRNESS panel */
+.fpanel{border-radius:16px;padding:22px;background:linear-gradient(180deg,#0e1a1c,#0a1214);border:1px solid rgba(69,212,224,.3);box-shadow:0 24px 60px rgba(0,0,0,.6);}
+.fpanel .ph{display:flex;align-items:center;gap:10px;margin-bottom:13px;}
+.fpanel .ph .bub{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 38% 32%,#f0d79e,#c9a05c 60%,#8a6a32);color:#0c1316;font-weight:700;font-size:13px;}
+.fpanel .ph .t{font-family:var(--serif);font-size:18px;color:#9fdfe6;}
+.fpanel .intro{font-size:11.5px;line-height:1.6;color:var(--inkDim);margin-bottom:14px;}
+.fseat{padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(69,212,224,.15);margin-bottom:9px;}
+.fseat .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;}
+.fseat .who{font-size:12px;color:var(--ink);}
+.fbadge{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid rgba(69,212,224,.5);background:rgba(69,212,224,.1);color:var(--cyan);}
+.frow{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--cyanDim);padding:2px 0;}
+.frow .k{font-family:var(--sans);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--inkDim);}
 
-/* ---- two-column ---- */
-.cols{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center;}
-.cols.rev{grid-template-columns:.95fr 1.05fr;}
+/* WAYS */
+.ways{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:30px;}
+.way{position:relative;padding:22px 20px;border-radius:15px;overflow:hidden;background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.24);transition:transform .4s,border-color .4s;}
+.way:hover{transform:translateY(-5px);border-color:rgba(201,160,92,.5);}
+.way .wi{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;color:var(--goldText);font-size:19px;margin-bottom:14px;background:rgba(201,160,92,.1);border:1px solid rgba(201,160,92,.32);}
+.way .num{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--gold);text-transform:uppercase;}
+.way h4{margin:6px 0 0;font-family:var(--serif);font-weight:700;font-size:19px;color:var(--goldText);}
+.way p{margin:9px 0 0;font-size:12px;line-height:1.55;color:var(--inkDim);}.way p code{color:var(--cyanDim);}
 
-/* ---- playing cards ---- */
-.card{position:relative;width:62px;height:88px;border-radius:8px;font-family:var(--serif);display:grid;place-items:center;flex:none;
-  background:linear-gradient(162deg,#f8f2e6,#e9ddc5);border:1px solid #cdbd9a;box-shadow:inset 0 1px 2px rgba(255,255,255,.9),0 6px 13px rgba(0,0,0,.4);}
-.card .big{font-size:38px;}
-.card .corner{position:absolute;display:flex;flex-direction:column;align-items:center;line-height:.82;}
-.card .corner.tl{top:5px;left:7px;}
-.card .corner.br{bottom:5px;right:7px;transform:rotate(180deg);}
-.card .corner .rk{font-size:18px;font-weight:600;}
-.card .corner .pp{font-size:13px;}
-.card.red,.card.red .big{color:var(--cardRed);}
-.card.black,.card.black .big{color:var(--cardBlack);}
-.card.win{border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,160,92,.5),0 8px 18px rgba(0,0,0,.5);}
+/* FEATURE grid */
+.fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:30px;}
+.feat{padding:22px 20px;border-radius:15px;background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.2);transition:transform .4s,border-color .4s;}
+.feat:hover{transform:translateY(-5px);border-color:rgba(201,160,92,.42);}
+.feat.cy{border-color:rgba(69,212,224,.22);}.feat.cy:hover{border-color:rgba(69,212,224,.45);}
+.feat .fi{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:20px;margin-bottom:14px;color:var(--goldText);background:rgba(201,160,92,.1);border:1px solid rgba(201,160,92,.3);}
+.feat.cy .fi{color:var(--cyan);background:rgba(69,212,224,.08);border-color:rgba(69,212,224,.3);}
+.feat h4{margin:0;font-family:var(--serif);font-size:18px;color:var(--ink);font-weight:600;}
+.feat p{margin:8px 0 0;font-size:12px;color:var(--inkDim);line-height:1.55;}.feat p code{color:var(--cyanDim);}
 
-/* ---- locked card ---- */
-.locked{position:relative;width:62px;height:88px;border-radius:8px;overflow:hidden;flex:none;
-  background:repeating-linear-gradient(45deg,#3a181b 0 7px,#2a1013 7px 14px);border:1.5px solid rgba(69,212,224,.35);box-shadow:0 7px 16px rgba(0,0,0,.5);}
-.locked.brass{background:repeating-linear-gradient(45deg,#6e1a20 0 7px,#561318 7px 14px);border-color:rgba(201,160,92,.55);}
-.locked .shim{position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(69,212,224,.28) 50%,transparent 70%);background-size:220% 100%;mix-blend-mode:screen;animation:shimmer 2.6s linear infinite;}
-.locked .pad{position:absolute;inset:0;display:grid;place-items:center;font-size:26px;color:var(--cyan);animation:lockglow 2.4s ease-in-out infinite;}
-.locked.brass .pad{color:var(--goldText);}
-
-/* ---- chips ---- */
-.chip{width:34px;height:34px;border-radius:50%;border:3px dashed rgba(60,40,12,.5);box-shadow:0 3px 8px rgba(0,0,0,.5);flex:none;
-  background:radial-gradient(circle at 50% 35%,#f6e6bf,#b98e44);}
-.chip.red{background:radial-gradient(circle at 50% 35%,#5a262b,#2a1013);border-color:rgba(120,40,40,.5);}
-
-/* ---- padlock dance diagram ---- */
-.dance{display:flex;flex-direction:column;gap:14px;margin-top:40px;}
-.danceRow{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:18px 20px;border-radius:12px;
-  background:linear-gradient(180deg,rgba(36,22,18,.7),rgba(21,14,12,.7));border:1px solid rgba(201,160,92,.18);}
-.danceRow .step{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--serif);font-weight:700;font-size:16px;color:#2a1e0c;
-  background:radial-gradient(circle at 38% 32%,#f0d79e,#c9a05c 60%,#8a6a32);box-shadow:0 2px 6px rgba(0,0,0,.5);}
-.danceRow .txt{flex:1;min-width:220px;font-size:14px;color:var(--inkDim);line-height:1.55;}
-.danceRow .txt b{color:var(--ink);font-weight:600;}
-.lockpill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:12px;font-family:var(--mono);
-  border:1px solid rgba(69,212,224,.35);background:rgba(69,212,224,.08);color:var(--cyan);white-space:nowrap;}
-.lockpill.gold{border-color:rgba(201,160,92,.4);background:rgba(201,160,92,.08);color:var(--goldText);}
-
-/* equation chip */
-.eq{display:inline-block;margin-top:26px;padding:16px 22px;border-radius:12px;font-family:var(--mono);font-size:15px;color:var(--cyanDim);
-  background:rgba(69,212,224,.05);border:1px solid rgba(69,212,224,.22);line-height:1.7;}
-.eq b{color:var(--cyan);font-weight:500;}
-
-/* ---- settlement: 4 ways ---- */
-.ways{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-top:40px;}
-.way{padding:24px 22px;border-radius:14px;background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.24);position:relative;overflow:hidden;}
-.way .num{font-family:var(--serif);font-size:13px;color:var(--gold);letter-spacing:.2em;}
-.way h4{margin:8px 0 0;font-family:var(--serif);font-weight:700;font-size:22px;color:var(--goldText);}
-.way p{margin:10px 0 0;font-size:13.5px;line-height:1.6;color:var(--inkDim);}
-.way .ic{position:absolute;top:18px;right:20px;font-size:22px;opacity:.5;}
-
-/* ---- flow rail ---- */
-.flow{display:flex;flex-wrap:wrap;gap:10px;margin-top:38px;align-items:stretch;}
-.phase{flex:1;min-width:120px;padding:16px 14px;border-radius:11px;background:linear-gradient(180deg,rgba(36,22,18,.6),rgba(21,14,12,.6));border:1px solid rgba(201,160,92,.16);position:relative;}
-.phase .ph-i{font-size:18px;}
-.phase .ph-n{margin-top:8px;font-family:var(--serif);font-size:16px;color:var(--ink);}
-.phase .ph-d{margin-top:5px;font-size:11.5px;color:var(--inkFaint);line-height:1.45;}
-.phase.chain{border-color:rgba(201,160,92,.4);}
-.phase.crypto{border-color:rgba(69,212,224,.32);}
-.phase .tag{position:absolute;top:10px;right:11px;font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;padding:2px 6px;border-radius:999px;}
+/* RAIL */
+.rail{position:relative;margin-top:40px;}
+.rail .baseline{position:absolute;top:32px;left:5%;right:5%;height:2px;background:rgba(201,160,92,.16);}
+.rail .fillline{position:absolute;top:32px;left:5%;width:0;height:2px;background:linear-gradient(90deg,#c9a05c,#45d4e0);box-shadow:0 0 12px rgba(69,212,224,.4);transition:width 2.2s cubic-bezier(.5,0,.2,1);}
+.rail.in .fillline{width:90%;}
+.railrow{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;position:relative;}
+.phase{text-align:center;opacity:0;transform:translateY(16px);transition:opacity .6s,transform .6s;}
+.rail.in .phase{opacity:1;transform:none;}
+.phase .ring{width:64px;height:64px;margin:0 auto;border-radius:50%;display:grid;place-items:center;font-size:23px;color:var(--goldText);background:radial-gradient(circle at 38% 32%,#1c130f,#120c0a);border:1px solid rgba(201,160,92,.3);}
+.phase.crypto .ring{color:var(--cyan);border-color:rgba(69,212,224,.32);}
+.phase .pn{margin-top:12px;font-family:var(--serif);font-size:16px;color:var(--ink);}
+.phase .pd{margin-top:4px;font-size:10.5px;color:var(--inkFaint);line-height:1.4;}
+.phase .tag{display:inline-block;margin-top:7px;font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;padding:2px 7px;border-radius:999px;}
 .phase.chain .tag{color:var(--goldText);border:1px solid rgba(201,160,92,.4);}
 .phase.crypto .tag{color:var(--cyan);border:1px solid rgba(69,212,224,.4);}
 
-/* ---- architecture ---- */
-.arch{margin-top:40px;padding:30px;border-radius:16px;background:radial-gradient(120% 100% at 50% 0%,rgba(32,74,64,.25),transparent 60%),linear-gradient(180deg,#0e1a16,#0a1210);border:1px solid rgba(69,212,224,.18);}
+/* ARCH */
+.arch{margin-top:24px;padding:28px;border-radius:18px;background:radial-gradient(120% 100% at 50% 0%,rgba(32,74,64,.26),transparent 60%),linear-gradient(180deg,#0e1a16,#0a1210);border:1px solid rgba(69,212,224,.18);}
 .archGrid{display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:center;}
-.node{padding:18px 18px;border-radius:12px;text-align:center;background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.3);}
-.node.player{border-color:rgba(201,160,92,.35);}
+.node{padding:18px;border-radius:13px;text-align:center;background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.3);}
 .node.relay{border-color:rgba(69,212,224,.35);background:linear-gradient(180deg,#0e1a1c,#0a1214);}
-.node .nh{font-family:var(--serif);font-size:18px;color:var(--goldText);}
+.node .nh{font-family:var(--serif);font-size:17px;color:var(--goldText);display:flex;align-items:center;justify-content:center;gap:9px;}
 .node.relay .nh{color:#9fdfe6;}
-.node .ns{margin-top:8px;font-size:11.5px;color:var(--inkDim);line-height:1.55;}
-.archWS{text-align:center;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--cyanDim);}
-.archWS .pipe{display:block;color:rgba(69,212,224,.4);font-size:18px;letter-spacing:0;}
-.archBottom{margin-top:20px;text-align:center;padding:18px;border-radius:12px;border:1px solid rgba(201,160,92,.3);background:linear-gradient(180deg,#1c1410,#120c0a);}
-.archBottom .nh{font-family:var(--serif);font-size:18px;color:var(--goldText);}
-.archBottom .ns{margin-top:6px;font-size:11.5px;color:var(--inkDim);}
+.node .ns{margin-top:8px;font-size:11px;color:var(--inkDim);line-height:1.5;}
+.archWS{text-align:center;font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--cyanDim);line-height:1.7;}
+.archWS .pipe{display:block;color:rgba(69,212,224,.45);font-size:21px;margin:3px 0;animation:pulsewide 2.4s ease-in-out infinite;}
+.archConn{text-align:center;margin:14px 0;color:rgba(69,212,224,.4);font-size:16px;letter-spacing:1em;}
+.archBottom{margin-top:14px;text-align:center;padding:18px;border-radius:13px;border:1px solid rgba(201,160,92,.32);background:linear-gradient(180deg,#1c1410,#120c0a);}
+.archBottom .nh{font-family:var(--serif);font-size:17px;color:var(--goldText);}
+.archBottom .ns{margin-top:6px;font-size:11px;color:var(--inkDim);}
 
-/* ---- feature grid ---- */
-.fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px;}
-.feat{padding:26px 22px;border-radius:14px;background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.2);}
-.feat .fi{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:19px;margin-bottom:14px;
-  background:rgba(201,160,92,.1);border:1px solid rgba(201,160,92,.3);}
-.feat.cy .fi{background:rgba(69,212,224,.08);border-color:rgba(69,212,224,.3);}
-.feat h4{margin:0;font-family:var(--serif);font-size:19px;color:var(--ink);font-weight:600;}
-.feat p{margin:9px 0 0;font-size:13px;color:var(--inkDim);line-height:1.6;}
+/* PROOF */
+.proof{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:34px;}
+.pcard{padding:30px 18px;text-align:center;border-radius:14px;background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.22);transition:transform .4s,border-color .4s;}
+.pcard:hover{transform:translateY(-5px);border-color:rgba(201,160,92,.45);}
+.pcard .pn{font-family:var(--serif);font-weight:700;font-size:40px;line-height:1;background:linear-gradient(180deg,#f6e6bf,#cba055);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.pcard .pl{margin-top:10px;font-size:11.5px;color:var(--inkDim);line-height:1.5;}
 
-/* ---- proof / test stats ---- */
-.proof{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:40px;}
-.pcard{padding:24px 16px;text-align:center;border-radius:13px;background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.22);}
-.pcard .pn{font-family:var(--serif);font-weight:700;font-size:34px;
-  background:linear-gradient(180deg,#f6e6bf,#cba055);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
-.pcard .pl{margin-top:8px;font-size:11.5px;color:var(--inkDim);line-height:1.45;letter-spacing:.02em;}
+/* CLOSE */
+.close-slide{text-align:center;}
+.stackrow{display:flex;flex-wrap:wrap;justify-content:center;gap:9px;margin-top:24px;max-width:640px;}
+.tech{font-family:var(--mono);padding:7px 14px;border-radius:999px;font-size:11px;color:var(--inkDim);border:1px solid rgba(201,160,92,.22);background:rgba(201,160,92,.04);}
+.footnote{margin-top:26px;font-size:11.5px;color:var(--inkFaint);line-height:1.7;}
 
-/* ---- callout ---- */
-.callout{margin-top:38px;padding:26px 28px;border-radius:14px;border-left:3px solid var(--cyan);background:linear-gradient(90deg,rgba(69,212,224,.06),transparent);}
-.callout p{margin:0;font-family:var(--serif);font-style:italic;font-size:19px;line-height:1.55;color:#cde8eb;}
+/* ============ DECK CHROME ============ */
+.progress{position:fixed;top:0;left:0;height:2px;width:0;z-index:60;background:linear-gradient(90deg,#7d5f2c,#f6e6bf 60%,#45d4e0);box-shadow:0 0 12px rgba(201,160,92,.6);transition:width .7s cubic-bezier(.7,0,.18,1);}
+.brand{position:fixed;top:20px;left:24px;z-index:55;display:flex;align-items:center;gap:11px;}
+.brand .nm{font-family:var(--serif);font-size:15px;letter-spacing:.04em;color:var(--goldText);}
+.counter{position:fixed;top:20px;right:24px;z-index:55;font-family:var(--mono);font-size:12px;letter-spacing:.16em;color:var(--inkDim);}
+.counter b{color:var(--goldLt);font-weight:500;}
+.chev{position:fixed;top:50%;transform:translateY(-50%);z-index:55;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;cursor:pointer;
+  background:linear-gradient(180deg,#241612,#150e0c);border:1px solid rgba(201,160,92,.3);color:var(--goldText);font-size:20px;transition:all .3s;opacity:.7;}
+.chev:hover{opacity:1;border-color:rgba(201,160,92,.6);box-shadow:0 0 20px rgba(201,160,92,.15);}
+.chev.prev{left:20px;}.chev.next{right:20px;}
+.chev[disabled]{opacity:.2;pointer-events:none;}
+.hint{position:fixed;bottom:54px;left:50%;transform:translateX(-50%);z-index:55;font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--inkFaint);transition:opacity .6s;}
+.notesbtn{position:fixed;bottom:22px;right:24px;z-index:55;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--inkFaint);cursor:pointer;background:transparent;border:1px solid rgba(201,160,92,.2);padding:7px 12px;border-radius:8px;transition:all .3s;}
+.notesbtn:hover{color:var(--goldText);border-color:rgba(201,160,92,.5);}
+.notes{position:fixed;left:0;right:0;bottom:0;z-index:54;transform:translateY(102%);transition:transform .4s cubic-bezier(.5,0,.2,1);
+  background:linear-gradient(180deg,rgba(14,10,8,.97),rgba(8,5,4,.99));border-top:1px solid rgba(201,160,92,.25);padding:22px 80px 26px;backdrop-filter:blur(8px);}
+.notes.show{transform:none;}
+.notes .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--gold);}
+.notes p{margin:10px 0 0;font-family:var(--serif);font-size:clamp(16px,1.7vw,21px);line-height:1.5;color:#e6dcc6;max-width:1000px;}
 
-/* ---- footer ---- */
-footer{padding:80px 24px 90px;text-align:center;border-top:1px solid rgba(201,160,92,.14);background:radial-gradient(80% 60% at 50% 100%,rgba(32,74,64,.16),transparent);}
-.stackrow{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:26px;}
-.tech{padding:7px 14px;border-radius:999px;font-size:12px;color:var(--inkDim);border:1px solid rgba(201,160,92,.22);background:rgba(201,160,92,.04);}
-.footnote{margin-top:34px;font-size:12px;color:var(--inkFaint);line-height:1.7;}
+@media (max-width:820px){
+  .two{grid-template-columns:1fr;gap:24px;}
+  .ways{grid-template-columns:1fr 1fr;}.fgrid{grid-template-columns:1fr 1fr;}.proof{grid-template-columns:1fr 1fr;}
+  .archGrid{grid-template-columns:1fr;}.archWS .pipe{transform:rotate(90deg);}
+  .railrow{grid-template-columns:repeat(3,1fr);gap:24px 10px;}.rail .baseline,.rail .fillline{display:none;}
+  .chev{display:none;}.notes{padding:20px 24px 24px;}
+}
+@media (max-height:680px){
+  h2.title{font-size:clamp(24px,3.4vw,38px);}.copy{font-size:12.5px;line-height:1.55;}
+  .ways .way p,.feat p{font-size:11px;}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;}
+  .track{transition:none;}.slide .reveal{opacity:1;transform:none;}
+  .rail .fillline{width:90%;}.rail .phase{opacity:1;transform:none;}
+}
 
-/* ---- section divider ornament ---- */
-.divider{display:flex;align-items:center;justify-content:center;gap:14px;color:var(--inkFaint);font-size:13px;}
-.divider .ln{width:70px;height:1px;background:linear-gradient(90deg,transparent,rgba(201,160,92,.45));}
-.divider .ln.r{background:linear-gradient(90deg,rgba(201,160,92,.45),transparent);}
-
-/* ---- keyframes (lifted from theme.ts) ---- */
 @keyframes shimmer{0%{background-position:-180% 0}100%{background-position:280% 0}}
 @keyframes lockglow{0%,100%{opacity:.6;filter:drop-shadow(0 0 6px rgba(69,212,224,.5))}50%{opacity:1;filter:drop-shadow(0 0 16px rgba(69,212,224,.95))}}
-@keyframes potpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05);filter:drop-shadow(0 0 22px rgba(201,160,92,.45))}}
-@keyframes spotbreath{0%,100%{opacity:.9}50%{opacity:1}}
-@keyframes rise{0%{transform:translateY(16px);opacity:0}100%{transform:translateY(0);opacity:1}}
-@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
-@keyframes floaty{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-10px) rotate(-4deg)}}
-
-@media (max-width:760px){
-  .cols,.cols.rev{grid-template-columns:1fr;gap:30px;}
-  .statband,.fgrid,.proof{grid-template-columns:1fr 1fr;}
-  .ways{grid-template-columns:1fr;}
-  .archGrid{grid-template-columns:1fr;}
-  .archWS .pipe{transform:rotate(90deg);}
-  section{padding:72px 0;}
-}
+@keyframes sheen{0%,100%{background-position:200% 0}45%,55%{background-position:-120% 0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes meshdrift{0%{transform:translate(0,0)}100%{transform:translate(3%,-2%)}}
+@keyframes riffle{0%{transform:translateY(0) rotateZ(0)}40%{transform:translateY(-24px) rotateZ(-6deg)}70%{transform:translateY(-24px) rotateZ(5deg)}100%{transform:translateY(0) rotateZ(0)}}
+@keyframes pulsewide{0%,100%{opacity:.5}50%{opacity:1}}
 </style>
 </head>
 <body>
 <div class="backdrop"></div>
+<div class="mesh"></div>
 <div class="grain"></div>
+<div class="spotlight" id="spot"></div>
 
-<!-- ============================= HERO ============================= -->
-<header class="hero">
-  <div class="spot"></div>
-  <div class="vig"></div>
-  <div class="hero-inner">
-    <span class="kicker">A Provably-Fair Card Room</span>
-    <div class="seal" style="width:112px;height:112px;margin-top:30px;">
-      <span class="dash"></span>
-      <span class="spade" style="font-size:52px;">♠</span>
-      <span class="lock" style="width:32px;height:32px;font-size:15px;">🔒</span>
-    </div>
-    <h1 class="wordmark">Sealed Deck</h1>
-    <div class="rule-row"><span class="line"></span>Heads-Up · No House<span class="line"></span></div>
-    <p class="hero-sub">Poker with no house. The deck is sealed by cryptography, the pot pays itself.</p>
-    <div class="fairtag"><span class="tick">✓</span>Provably-fair shuffle · settles on-chain on Avalanche</div>
-  </div>
-  <div class="scrollcue">Scroll<span class="arr">↓</span></div>
-</header>
+<!-- ICONS -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.3" width="15" height="9.7" rx="2.3"/><path d="M7.6 10.3V7.4a4.4 4.4 0 0 1 8.8 0v2.9"/><circle cx="12" cy="14.6" r="1.3"/><path d="M12 15.9v1.6"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 2.4v5.3c0 4.6-3 8-7 9.3-4-1.3-7-4.7-7-9.3V5.4L12 3z"/><path d="M9 12l2.2 2.2L15.4 10"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2"/><path d="M12 7.4V12l3.2 1.9"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20s1.1-.4 3.4-1.1C9.9 18 14.2 13.2 16.6 10.6l-3.2-3.2C10.8 9.8 6 14.1 5.1 16.6 4.4 18.9 4 20 4 20z"/><path d="M13.4 7.4l3.2 3.2"/><path d="M15.6 5.2l1.4-1.4a1.6 1.6 0 0 1 2.3 0l.9.9a1.6 1.6 0 0 1 0 2.3l-1.4 1.4"/></symbol>
+  <symbol id="i-fold" viewBox="0 0 24 24"><path d="M6 4h7.5L18 8.5V20H6z"/><path d="M13.5 4v4.5H18"/><path d="M9 13h6M9 16h4"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M5 9.5h9.2a5 5 0 1 1-5 5"/><path d="M5 9.5l3.4-3.2M5 9.5l3.4 3.2"/></symbol>
+  <symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M4 12s3.1-5.4 8-5.4 8 5.4 8 5.4-3.1 5.4-8 5.4S4 12 4 12z"/><circle cx="12" cy="12" r="2.4"/><path d="M5 19.5 19 4.5"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M4 7h3c1.7 0 2.7 1.1 3.8 2.6"/><path d="M4 17h3c1.7 0 2.7-1.1 3.8-2.6"/><path d="M13.4 9.6C14.4 8.1 15.4 7 17 7h3"/><path d="M13.4 14.4C14.4 15.9 15.4 17 17 17h3"/><path d="M17.6 4.8 20.4 7l-2.8 2.2"/><path d="M17.6 14.8 20.4 17l-2.8 2.2"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M9.6 14.4 14.4 9.6"/><path d="M8.2 12 6.6 13.6a3.2 3.2 0 0 0 4.5 4.5L13 16.2"/><path d="M15.8 12l1.6-1.6a3.2 3.2 0 0 0-4.5-4.5L11 7.8"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.7-4.7"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3 5.5 13H10l-1 8 8.5-11H13l1-7z"/></symbol>
+  <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.6v8.8"/><path d="M14.6 9.4c0-1-1.1-1.7-2.6-1.7s-2.6.8-2.6 1.8 1.1 1.5 2.6 1.7 2.6.7 2.6 1.8-1.1 1.7-2.6 1.7-2.6-.7-2.6-1.7"/></symbol>
+  <symbol id="i-seat" viewBox="0 0 24 24"><path d="M7 4v8M17 4v8"/><path d="M6 12h12"/><path d="M7 12l-1.3 7M17 12l1.3 7"/><path d="M6.4 16h11.2"/></symbol>
+  <symbol id="i-finger" viewBox="0 0 24 24"><path d="M6 11.5a6 6 0 0 1 11.4-2.6"/><path d="M9 11.5a3 3 0 0 1 6 0v1.5"/><path d="M12 11.5v4"/><path d="M15 13.5a8 8 0 0 1-1.1 5"/><path d="M9 14a6.5 6.5 0 0 0 .6 6"/></symbol>
+  <symbol id="i-deal" viewBox="0 0 24 24"><rect x="4.5" y="7" width="8" height="11.4" rx="1.4" transform="rotate(-11 8.5 12.7)"/><rect x="11.5" y="6.6" width="8" height="11.4" rx="1.4" transform="rotate(9 15.5 12.3)"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 5h10v3.2a5 5 0 0 1-10 0V5z"/><path d="M7 6.2H4.6a2.4 2.4 0 0 0 2.6 3.9"/><path d="M17 6.2h2.4a2.4 2.4 0 0 1-2.6 3.9"/><path d="M10 13.4 9.4 17h5.2L14 13.4"/><path d="M8 20h8M9.4 17h5.2"/></symbol>
+  <symbol id="i-node" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.1"/><path d="M8 8a5.6 5.6 0 0 0 0 8M16 8a5.6 5.6 0 0 1 0 8"/><path d="M5.2 5.2a9 9 0 0 0 0 13.6M18.8 5.2a9 9 0 0 1 0 13.6"/></symbol>
+  <symbol id="i-spade" viewBox="0 0 24 24"><path d="M12 3.5C9 6.8 5 9.4 5 13a3.4 3.4 0 0 0 5.6 2.6C10.4 17.6 9.6 19 8.4 20h7.2c-1.2-1-2-2.4-2.2-4.4A3.4 3.4 0 0 0 19 13c0-3.6-4-6.2-7-9.5z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+</svg>
 
-<!-- ============================= THE PROBLEM ============================= -->
-<section>
-  <div class="wrap reveal">
-    <span class="kicker">The Problem</span>
-    <h2 class="title">Every online card game asks you to trust the dealer.</h2>
-    <p class="body-copy">
-      When you play poker online, an invisible operator shuffles the deck, holds the money, and can see
-      every card on the table. You are trusting that the shuffle was random, that nobody is peeking at your
-      hand, and that the pot will actually be paid out. History says that trust gets abused.
-    </p>
-    <p class="body-copy">
-      In the <strong>UltimateBet &amp; Absolute Poker "superuser" scandal</strong>, insiders used god-mode
-      accounts that could see opponents' hole cards — stealing from some of the biggest names in the game,
-      for <em>years</em>, before a leaked hand history exposed play that was simply too perfect to be human.
-    </p>
-    <div class="statband">
-      <div class="panel stat bad reveal"><div class="big">$50M+</div><div class="lbl">estimated stolen from players by accounts that could see their cards</div></div>
-      <div class="panel stat bad reveal"><div class="big">~4 yrs</div><div class="lbl">the cheating ran undetected, from 2004 until a support slip-up exposed it</div></div>
-      <div class="panel stat bad reveal"><div class="big">1</div><div class="lbl">trusted operator — the single point of failure in every centralized card room</div></div>
-    </div>
-    <p class="body-copy" style="margin-top:34px;">
-      The fix isn't "trust a better operator." It's to build a game where <strong>nobody can cheat because
-      nobody holds that power</strong> — not the other player, not the server, not the people who wrote it.
-    </p>
-  </div>
-</section>
+<div class="progress" id="progress"></div>
+<div class="brand"><span class="seal" style="width:30px;height:30px;"><span class="spade" style="font-size:15px;">♠</span><span class="lock" style="width:13px;height:13px;right:-3px;bottom:-3px;"><svg class="ic" style="width:7px;height:7px"><use href="#i-lock"/></svg></span></span><span class="nm">Sealed Deck</span></div>
+<div class="counter"><b id="cnum">01</b> / <span id="ctot">12</span></div>
 
-<div class="divider reveal"><span class="ln"></span>♠<span class="ln r"></span></div>
+<div class="deck">
+  <div class="track" id="track">
 
-<!-- ============================= THE IDEA ============================= -->
-<section>
-  <div class="wrap reveal">
-    <span class="kicker">The Idea — Mental Poker, 1979</span>
-    <h2 class="title">Can two players deal a fair hand with no trusted dealer at all?</h2>
-    <p class="body-copy">
-      The question is older than the internet. In 1979, <strong>Shamir, Rivest and Adleman</strong> — the R, S
-      and A of RSA — asked whether two players who don't trust each other could play a fair game of poker
-      <em>"without using any cards and without any trusted intermediary."</em> Their answer became the founding
-      example of secure multi-party computation.
-    </p>
-    <p class="body-copy">
-      The trick is a special kind of lock. Sealed Deck builds the modern version of their protocol — two
-      browsers shuffle and encrypt a deck between themselves, settle the money on a public blockchain, and
-      a relay server in the middle never holds a key, never sees a card, and can never move a chip.
-    </p>
-    <div class="callout reveal">
-      <p>"Can two potentially dishonest players play a fair game of poker without any mutually trusted intermediary?" — Shamir, Rivest &amp; Adleman, <em>Mental Poker</em> (1979)</p>
-    </div>
-  </div>
-</section>
-
-<!-- ============================= THE PADLOCK DANCE ============================= -->
-<section>
-  <div class="wrap">
-    <div class="cols">
-      <div class="reveal">
-        <span class="kicker">How — The Padlock Dance</span>
-        <h2 class="title">Two padlocks that open in any order.</h2>
-        <p class="body-copy">
-          Sealed Deck uses <strong>SRA commutative encryption</strong>. Each card is a number; each player's
-          key is an exponent applied modulo a large prime. Because exponents multiply, the order you lock and
-          unlock doesn't matter — <span class="cy">A's lock and B's lock commute</span>.
-        </p>
-        <p class="body-copy">
-          Picture a box with two padlocks. To shuffle, each player locks the whole deck with their own padlock
-          and shuffles the order. Neither can read a card, because the other's lock is still on. To deal a card
-          to one player, the <em>other</em> player simply removes their padlock — leaving exactly one lock that
-          only the owner can open.
-        </p>
-        <div class="eq reveal">
-          encrypt: <b>m → mᵉ mod p</b><br>
-          two locks: <b>(mᵉᴬ)ᵉᴮ = mᵉᴬ·ᵉᴮ = (mᵉᴮ)ᵉᴬ</b><br>
-          <span style="color:var(--inkFaint)">…so locks peel off in any order.</span>
+    <!-- 01 TITLE -->
+    <section class="slide title-slide" data-id="title">
+      <div class="s-inner title-stage" id="titleStage">
+        <div class="floatcards gathered" id="floatcards">
+          <div class="fc fc1"><div class="fc-in"><div class="dcard"><div class="back"><span class="pat"></span></div></div></div></div>
+          <div class="fc fc2"><div class="fc-in"><div class="dcard" style="transform:rotateY(180deg)"><div class="back"><span class="pat"></span></div><div class="face black"><span class="cn"><span class="rk">A</span><span style="font-size:12px">♠</span></span><span class="big">♠</span></div></div></div></div>
+          <div class="fc fc3"><div class="fc-in"><div class="dcard" style="transform:rotateY(180deg)"><div class="back"><span class="pat"></span></div><div class="face red"><span class="cn" style="color:var(--cardRed)"><span class="rk">K</span><span style="font-size:12px">♥</span></span><span class="big">♥</span></div></div></div></div>
+          <div class="fc fc4"><div class="fc-in"><div class="dcard"><div class="back"><span class="pat"></span></div></div></div></div>
         </div>
+        <div class="reveal"><span class="kick"><span class="ln"></span>A Provably-Fair Card Room<span class="ln r"></span></span></div>
+        <div class="reveal" style="margin-top:22px;"><span class="seal" style="width:108px;height:108px;display:inline-grid;"><span class="dash"></span><span class="spade" style="font-size:50px;">♠</span><span class="lock" style="width:32px;height:32px;"><svg class="ic" style="width:15px;height:15px"><use href="#i-lock"/></svg></span></span></div>
+        <h1 class="wordmark reveal"><span class="wm-base">Sealed Deck</span><span class="wm-sheen" aria-hidden="true">Sealed Deck</span></h1>
+        <div class="rulerow reveal"><span class="l"></span>Heads-Up · No House<span class="l"></span></div>
+        <p class="hero-sub reveal">Poker with no house. The deck is sealed by cryptography, the pot pays itself.</p>
+        <div class="fairtag reveal"><span class="tick"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg></span>Provably-fair shuffle · settles on-chain on Avalanche</div>
       </div>
-      <div class="reveal">
-        <div class="dance">
-          <div class="danceRow">
-            <span class="step">1</span>
-            <div class="txt"><b>Seat A</b> encrypts the whole deck with key&nbsp;A and shuffles it.</div>
-            <span class="lockpill">🔒 A</span>
+    </section>
+
+    <!-- 02 PROBLEM -->
+    <section class="slide" data-id="problem">
+      <div class="s-inner">
+        <div class="reveal"><div class="eyebrow"><span class="idx">01</span><span class="sx">♠</span> The Problem <span class="ln"></span></div></div>
+        <div class="two" style="margin-top:18px;">
+          <div>
+            <h2 class="title reveal wide">Every card game online asks you to trust the dealer.</h2>
+            <p class="copy reveal">An invisible operator shuffles the deck, holds the money, and can see every card. In the <strong>UltimateBet &amp; Absolute Poker scandal</strong>, insiders ran god-mode accounts that saw opponents' hole cards — robbing players for <em>years</em>.</p>
+            <div class="pullquote reveal"><p>The fix isn't "trust a better operator." It's a game where nobody <em>can</em> cheat — because nobody holds that power.</p><div class="src">— the premise of Sealed Deck</div></div>
           </div>
-          <div class="danceRow">
-            <span class="step">2</span>
-            <div class="txt"><b>Seat B</b> adds key&nbsp;B on top and shuffles again. Now no one knows the order.</div>
-            <span class="lockpill">🔒 A</span><span class="lockpill">🔒 B</span>
-          </div>
-          <div class="danceRow">
-            <span class="step">3</span>
-            <div class="txt">Each card is <b>re-locked per-card</b> so individual cards can be opened selectively.</div>
-            <span class="lockpill gold">🔐 per-card</span>
-          </div>
-          <div class="danceRow">
-            <span class="step">4</span>
-            <div class="txt">To deal A's hole card, <b>B peels off B's lock</b> only. A opens the rest — privately.</div>
-            <div style="display:flex;gap:8px;">
-              <div class="locked"><div class="shim"></div><div class="pad">🔒</div></div>
+          <div class="reveal">
+            <div class="dossier">
+              <div class="dcell"><div class="tagline">Stolen from players</div><div class="fig"><span class="count" data-to="50" data-pre="$" data-suf="M+">$0</span></div><div class="cap">taken by accounts that could secretly see opponents' cards.</div></div>
+              <div class="dcell"><div class="tagline">Time undetected</div><div class="fig"><span class="count" data-to="4" data-pre="~" data-suf=" yrs">~0</span></div><div class="cap">running until a support slip-up exposed the cheating.</div></div>
+              <div class="dcell g"><div class="tagline">Point of failure</div><div class="fig"><span class="count" data-to="1">0</span></div><div class="cap">trusted operator — the weakness in every centralized card room.</div></div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
-</section>
+    </section>
 
-<!-- ============================= PROVABLY FAIR / COMMIT-REVEAL ============================= -->
-<section>
-  <div class="wrap">
-    <div class="cols rev">
-      <div class="reveal">
-        <div class="panel cyan" style="padding:24px;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-            <span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 38% 32%,#f0d79e,#c9a05c 60%,#8a6a32);color:#0c1316;font-weight:700;font-size:13px;">✓</span>
-            <span style="font-family:var(--serif);font-size:18px;color:#9fdfe6;">Provably Fair</span>
+    <!-- 03 IDEA -->
+    <section class="slide" data-id="idea">
+      <div class="s-inner" style="text-align:center;display:flex;flex-direction:column;align-items:center;">
+        <div class="reveal"><div class="eyebrow" style="justify-content:center;"><span class="idx">02</span><span class="sx">♥</span> The Idea — Mental Poker, 1979</div></div>
+        <h2 class="title reveal wide" style="margin-left:auto;margin-right:auto;text-align:center;">Can two strangers deal a fair hand with no dealer at all?</h2>
+        <p class="copy reveal" style="text-align:center;">In 1979, <strong>Shamir, Rivest &amp; Adleman</strong> — the R, S and A of RSA — asked whether two players who don't trust each other could play fair poker with no trusted dealer. Sealed Deck is the modern build of their answer.</p>
+        <div class="pullquote reveal" style="border-left-color:var(--cyan);background:linear-gradient(90deg,rgba(69,212,224,.06),transparent);text-align:left;max-width:760px;margin-top:24px;">
+          <p style="color:#cfe9ec;">"Can two potentially dishonest players play a fair game of poker without any mutually trusted intermediary?"</p>
+          <div class="src" style="color:var(--cyanDim);">— Shamir, Rivest &amp; Adleman, <em>Mental Poker</em> (1979)</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04 PADLOCK DANCE -->
+    <section class="slide" data-id="dance">
+      <div class="s-inner">
+        <div class="two">
+          <div>
+            <div class="reveal"><div class="eyebrow"><span class="idx">03</span><span class="sx">♣</span> The Padlock Dance</div></div>
+            <h2 class="title reveal">Two locks that open in any order.</h2>
+            <p class="copy reveal">Sealed Deck uses <strong>SRA commutative encryption</strong>. Each card is a number; each player's key is an exponent mod a large prime. Because exponents multiply, <span class="cy">the locks commute</span> — order doesn't matter.</p>
+            <p class="copy reveal tight">Both players lock and shuffle the deck. To deal a card, the <em>other</em> player peels off only their lock — leaving one the owner alone can open.</p>
+            <div class="eqbox reveal"><span class="mut">encrypt</span> &nbsp;<b>m → mᵉ mod p</b><br><span class="mut">two locks</span> &nbsp;<b>(mᵉᴬ)ᵉᴮ = (mᵉᴮ)ᵉᴬ</b></div>
           </div>
-          <div style="font-size:11.5px;line-height:1.6;color:var(--inkDim);margin-bottom:16px;">
-            Each player commits <code class="cy">keccak256(seed)</code> on-chain <em>before</em> any card moves,
-            so neither can re-pick their shuffle after seeing the other's deck.
-          </div>
-          <div style="padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(69,212,224,.15);margin-bottom:10px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <span style="font-size:12px;color:var(--ink);">Seat 0 · 0x4a…b21c</span>
-              <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid rgba(69,212,224,.5);background:rgba(69,212,224,.1);color:var(--cyan);">Committed</span>
+          <div class="reveal">
+            <div class="demo" id="demo" data-stage="deck">
+              <span class="felt-ring"></span>
+              <span class="stagelbl" id="stageLbl">stage 1 / 7</span>
+              <div class="deckrow" id="deckrow">
+                <div class="dcard"><div class="back"><span class="pat"></span></div><div class="face red"><span class="cn" style="color:var(--cardRed)"><span class="rk">9</span><span style="font-size:11px">♦</span></span><span class="big">♦</span></div><div class="lk lkA"><svg class="ic"><use href="#i-lock"/></svg></div><div class="lk lkB"><svg class="ic"><use href="#i-lock"/></svg></div><div class="shim"></div></div>
+                <div class="dcard"><div class="back"><span class="pat"></span></div><div class="face black"><span class="cn"><span class="rk">J</span><span style="font-size:11px">♣</span></span><span class="big">♣</span></div><div class="lk lkA"><svg class="ic"><use href="#i-lock"/></svg></div><div class="lk lkB"><svg class="ic"><use href="#i-lock"/></svg></div><div class="shim"></div></div>
+                <div class="dcard hero-card"><div class="back"><span class="pat"></span></div><div class="face black"><span class="cn"><span class="rk">A</span><span style="font-size:11px">♠</span></span><span class="big">♠</span></div><div class="lk lkA"><svg class="ic"><use href="#i-lock"/></svg></div><div class="lk lkB"><svg class="ic"><use href="#i-lock"/></svg></div><div class="shim"></div></div>
+                <div class="dcard"><div class="back"><span class="pat"></span></div><div class="face red"><span class="cn" style="color:var(--cardRed)"><span class="rk">7</span><span style="font-size:11px">♥</span></span><span class="big">♥</span></div><div class="lk lkA"><svg class="ic"><use href="#i-lock"/></svg></div><div class="lk lkB"><svg class="ic"><use href="#i-lock"/></svg></div><div class="shim"></div></div>
+                <div class="dcard"><div class="back"><span class="pat"></span></div><div class="face black"><span class="cn"><span class="rk">Q</span><span style="font-size:11px">♣</span></span><span class="big">♣</span></div><div class="lk lkA"><svg class="ic"><use href="#i-lock"/></svg></div><div class="lk lkB"><svg class="ic"><use href="#i-lock"/></svg></div><div class="shim"></div></div>
+              </div>
+              <div class="cap" id="demoCap">A fresh deck. No one has touched the order yet.</div>
+              <div class="dots" id="demoDots"></div>
             </div>
-            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--cyanDim);padding:2px 0;"><span style="text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);font-size:9px;color:var(--inkDim);">commit</span><span>0x9f3a…c7e1…</span></div>
-            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--cyanDim);padding:2px 0;"><span style="text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);font-size:9px;color:var(--inkDim);">seed</span><span>sealed until showdown</span></div>
           </div>
-          <div style="padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(69,212,224,.15);">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <span style="font-size:12px;color:var(--ink);">Seat 1 · 0x8d…f09a</span>
-              <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid rgba(69,212,224,.5);background:rgba(69,212,224,.1);color:var(--cyan);">Hash verified ✓</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 PROVABLY FAIR -->
+    <section class="slide" data-id="fair">
+      <div class="s-inner">
+        <div class="two">
+          <div class="reveal">
+            <div class="fpanel">
+              <div class="ph"><span class="bub"><svg class="ic" style="width:13px;height:13px"><use href="#i-check"/></svg></span><span class="t">Provably Fair</span></div>
+              <div class="intro">Each player commits <code class="cy">keccak256(seed)</code> on-chain <em>before</em> any card moves — so neither can re-pick their shuffle after seeing the other's deck.</div>
+              <div class="fseat"><div class="top"><span class="who">Seat 0 · 0x4a…b21c</span><span class="fbadge">Committed</span></div><div class="frow"><span class="k">commit</span><span>0x9f3a…c7e1…</span></div><div class="frow"><span class="k">seed</span><span>sealed until showdown</span></div></div>
+              <div class="fseat"><div class="top"><span class="who">Seat 1 · 0x8d…f09a</span><span class="fbadge">Hash verified ✓</span></div><div class="frow"><span class="k">commit</span><span>0x21bd…4af0…</span></div><div class="frow"><span class="k">seed</span><span style="color:var(--cyan)">0x21bd…4af0…</span></div></div>
             </div>
-            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--cyanDim);padding:2px 0;"><span style="text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);font-size:9px;color:var(--inkDim);">commit</span><span>0x21bd…4af0…</span></div>
-            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--cyanDim);padding:2px 0;"><span style="text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);font-size:9px;color:var(--inkDim);">seed</span><span>0x21bd…4af0…</span></div>
+          </div>
+          <div>
+            <div class="reveal"><div class="eyebrow"><span class="idx">04</span><span class="sx">♦</span> Commit &amp; Reveal</div></div>
+            <h2 class="title reveal">Lock the shuffle in before a card is seen.</h2>
+            <p class="copy reveal">Encryption keeps cards <em>secret</em>. Commit-reveal keeps the shuffle <em>honest</em>. Before any card is dealt, each player publishes <code class="cy">keccak256(seed)</code> — a fingerprint of their randomness — to the contract.</p>
+            <p class="copy reveal tight">At showdown both reveal their seeds and the contract checks <code class="cy">keccak256(seed) == commitment</code> — the exact check anyone can rerun. The deal was fair, and you can prove it.</p>
           </div>
         </div>
       </div>
-      <div class="reveal">
-        <span class="kicker">The Other Half — Commit / Reveal</span>
-        <h2 class="title">Lock the shuffle in before any card is seen.</h2>
-        <p class="body-copy">
-          Encryption keeps cards <em>secret</em>. A second mechanism keeps the shuffle <em>honest</em>. Before
-          a single card is dealt, each player publishes <code class="cy">keccak256(seed)</code> — a fingerprint
-          of their shuffle randomness — directly to the smart contract.
-        </p>
-        <p class="body-copy">
-          Because the fingerprint is locked in first, nobody can change their shuffle after peeking at the
-          opponent's. At showdown, both players reveal their seeds and the contract checks
-          <code class="cy">keccak256(seed) == commitment</code> — the exact same check anyone can rerun. The
-          deal was fair, and you can prove it.
-        </p>
+    </section>
+
+    <!-- 06 THE MONEY -->
+    <section class="slide" data-id="money">
+      <div class="s-inner">
+        <div class="reveal"><div class="eyebrow"><span class="idx">05</span><span class="sx">♠</span> The Money — Trustless Custody <span class="ln"></span></div></div>
+        <h2 class="title reveal wide">No house holds the pot. The contract does.</h2>
+        <p class="copy reveal">Both players stake into a <code class="gd">PokerTable</code> contract on Avalanche Fuji. The pot can move only four ways — and <strong>no single player can ever claim it alone</strong>.</p>
+        <div class="ways">
+          <div class="way reveal"><div class="wi"><svg class="ic"><use href="#i-pen"/></svg></div><div class="num">Way Ⅰ</div><h4>Cooperative settle</h4><p>Both sign an EIP-712 <code>Settlement</code>. The contract verifies <em>both</em> signatures, then pays out.</p></div>
+          <div class="way reveal"><div class="wi"><svg class="ic"><use href="#i-fold"/></svg></div><div class="num">Way Ⅱ</div><h4>Fold</h4><p>If a player folds, their opponent takes the pot immediately — fully on-chain.</p></div>
+          <div class="way reveal"><div class="wi"><svg class="ic"><use href="#i-clock"/></svg></div><div class="num">Way Ⅲ</div><h4>Timeout slash</h4><p>Stall past <code>N</code> blocks and you forfeit your entire stake to the honest player. Can't freeze.</p></div>
+          <div class="way reveal"><div class="wi"><svg class="ic"><use href="#i-undo"/></svg></div><div class="num">Way Ⅳ</div><h4>Dispute void</h4><p>No agreed winner? Either calls <code>voidAndRefund</code> — each gets their own chips back. Never steal.</p></div>
+        </div>
+        <p class="copy reveal" style="margin-top:22px;"><strong>An honest player always recovers their funds.</strong> The relay signs nothing and holds no key — it can never touch the money.</p>
       </div>
-    </div>
-  </div>
-</section>
+    </section>
 
-<div class="divider reveal"><span class="ln"></span>♦<span class="ln r"></span></div>
-
-<!-- ============================= THE POT PAYS ITSELF ============================= -->
-<section>
-  <div class="wrap reveal">
-    <span class="kicker">The Money — Trustless Custody</span>
-    <h2 class="title">No house holds the pot. The contract does.</h2>
-    <p class="body-copy">
-      Both players stake their buy-in into a <code class="gd">PokerTable</code> smart contract on the
-      Avalanche Fuji C-Chain. From that moment the chips are governed by code, not by an operator. The pot
-      can move only four ways — and <strong>no single player can ever claim it unilaterally</strong>.
-    </p>
-    <div class="ways">
-      <div class="way reveal"><span class="ic">🤝</span><div class="num">WAY Ⅰ</div><h4>Cooperative settle</h4><p>Both players sign an EIP-712 <code>Settlement</code> agreeing on the winner and pot. The contract verifies <em>both</em> signatures match the two seats, then pays out. Neither can settle alone.</p></div>
-      <div class="way reveal"><span class="ic">🃏</span><div class="num">WAY Ⅱ</div><h4>Fold</h4><p>If a player folds, their opponent takes the pot immediately. The simplest, most common path — fully on-chain.</p></div>
-      <div class="way reveal"><span class="ic">⏱️</span><div class="num">WAY Ⅲ</div><h4>Timeout slash</h4><p>If a player stalls past <code>N</code> blocks, the other calls <code>claimTimeout</code>. The delinquent forfeits their entire stake to the honest player. The table can never freeze.</p></div>
-      <div class="way reveal"><span class="ic">↩️</span><div class="num">WAY Ⅳ</div><h4>Dispute void</h4><p>If both reveal but never agree on a signed winner, either may <code>voidAndRefund</code> after the deadline — each gets back exactly their own contribution. A griefer can force a void but can <em>never steal</em>.</p></div>
-    </div>
-    <p class="body-copy" style="margin-top:34px;">
-      The guarantee that matters: <strong>an honest player always recovers their funds</strong> — worst case,
-      they win by waiting out a timeout, or get fully refunded by a void. The relay server signs nothing and
-      holds no key; it can never touch the money.
-    </p>
-  </div>
-</section>
-
-<!-- ============================= x402 BUY-IN ============================= -->
-<section>
-  <div class="wrap reveal">
-    <span class="kicker">Buy-in — x402 on Avalanche</span>
-    <h2 class="title">Pay the table in USDC, gaslessly.</h2>
-    <p class="body-copy">
-      The default table runs on native <strong>AVAX</strong>. An optional path lets players buy in with
-      Avalanche-native Circle <strong>USDC</strong> over the <code class="gd">x402</code> HTTP-402 payment
-      standard. The buy-in is an <code class="cy">EIP-3009 transferWithAuthorization</code> the player signs
-      off-chain — no gas, no pre-approval — and the contract's
-      <code class="gd">joinWithAuthorization</code> settles it straight into the pot.
-    </p>
-    <div class="fgrid">
-      <div class="feat cy reveal"><div class="fi">✍️</div><h4>Sign, don't spend</h4><p>The player signs a payment authorization as an <code>X-PAYMENT</code> header. No upfront gas, no approve transaction.</p></div>
-      <div class="feat reveal"><div class="fi">🏦</div><h4>Straight to the table</h4><p>The authorization's recipient <em>is</em> the table contract — the x402 settlement primitive funds the pot directly.</p></div>
-      <div class="feat cy reveal"><div class="fi">💵</div><h4>Real USDC, USDC payout</h4><p>Native Circle USDC on Fuji, the same EIP-3009 token used by Avalanche x402 facilitators. The whole pot pays out in USDC.</p></div>
-    </div>
-  </div>
-</section>
-
-<div class="divider reveal"><span class="ln"></span>♣<span class="ln r"></span></div>
-
-<!-- ============================= HAND LIFECYCLE ============================= -->
-<section>
-  <div class="wrap reveal">
-    <span class="kicker">The Lifecycle — One Hand</span>
-    <h2 class="title">From empty table to settled pot.</h2>
-    <p class="body-copy">
-      Each phase is a strict, illegal-transition-proof state machine. Money and turn order are truth
-      <span class="gd">on-chain</span>; the card protocol runs <span class="cy">peer-to-peer over WebSocket</span>.
-    </p>
-    <div class="flow">
-      <div class="phase chain reveal"><span class="tag">chain</span><div class="ph-i">🪑</div><div class="ph-n">Join</div><div class="ph-d">Both stake the buy-in &amp; take a seat.</div></div>
-      <div class="phase chain reveal"><span class="tag">chain</span><div class="ph-i">🔒</div><div class="ph-n">Commit</div><div class="ph-d">Each posts keccak256(seed).</div></div>
-      <div class="phase crypto reveal"><span class="tag">crypto</span><div class="ph-i">♻️</div><div class="ph-n">Shuffle</div><div class="ph-d">The padlock dance over WS.</div></div>
-      <div class="phase crypto reveal"><span class="tag">crypto</span><div class="ph-i">🤲</div><div class="ph-n">Deal</div><div class="ph-d">Reveal shares → sealed hole cards.</div></div>
-      <div class="phase chain reveal"><span class="tag">chain</span><div class="ph-i">💰</div><div class="ph-n">Bet</div><div class="ph-d">Preflop → flop → turn → river.</div></div>
-      <div class="phase chain reveal"><span class="tag">chain</span><div class="ph-i">🏆</div><div class="ph-n">Showdown</div><div class="ph-d">Reveal seeds, sign, settle. Snowtrace.</div></div>
-    </div>
-  </div>
-</section>
-
-<!-- ============================= ARCHITECTURE ============================= -->
-<section>
-  <div class="wrap reveal">
-    <span class="kicker">The Shape Of It — Architecture</span>
-    <h2 class="title">Two browsers, a keyless relay, and a chain.</h2>
-    <div class="arch reveal">
-      <div class="archGrid">
-        <div class="node player">
-          <div class="nh">Player A</div>
-          <div class="ns">browser · wagmi + SRA crypto · holds their own keys &amp; cards</div>
-        </div>
-        <div class="archWS">
-          encrypted<br>card blobs
-          <span class="pipe">⇆</span>
-          never cleartext
-        </div>
-        <div class="node player">
-          <div class="nh">Player B</div>
-          <div class="ns">browser · wagmi + SRA crypto · holds their own keys &amp; cards</div>
+    <!-- 07 x402 -->
+    <section class="slide" data-id="x402">
+      <div class="s-inner">
+        <div class="reveal"><div class="eyebrow"><span class="idx">06</span><span class="sx">♥</span> Buy-in — x402 on Avalanche <span class="ln"></span></div></div>
+        <h2 class="title reveal wide">Pay the table in USDC, gaslessly.</h2>
+        <p class="copy reveal">The default table runs on native <strong>AVAX</strong>. Optionally, players buy in with Circle <strong>USDC</strong> over the <code class="gd">x402</code> standard: an <code class="cy">EIP-3009</code> authorization signed off-chain, settled straight into the contract.</p>
+        <div class="fgrid">
+          <div class="feat cy reveal"><div class="fi"><svg class="ic"><use href="#i-pen"/></svg></div><h4>Sign, don't spend</h4><p>The buy-in is a signed <code>X-PAYMENT</code> header. No upfront gas, no approve transaction.</p></div>
+          <div class="feat reveal"><div class="fi"><svg class="ic"><use href="#i-bolt"/></svg></div><h4>Straight to the table</h4><p>The authorization's recipient <em>is</em> the table contract — the x402 primitive funds the pot directly.</p></div>
+          <div class="feat cy reveal"><div class="fi"><svg class="ic"><use href="#i-coin"/></svg></div><h4>USDC in, USDC out</h4><p>Native Circle USDC on Fuji, the same token Avalanche x402 facilitators use. The pot pays in USDC.</p></div>
         </div>
       </div>
-      <div style="text-align:center;margin:18px 0;color:rgba(69,212,224,.45);font-size:20px;">↑ &nbsp; ↑</div>
-      <div class="node relay" style="max-width:520px;margin:0 auto;">
-        <div class="nh">Relay / Coordinator</div>
-        <div class="ns">Node · WebSocket relay + per-hand FSM + chain watcher + x402 buy-in route<br><strong style="color:var(--cyan)">holds no key · signs nothing · sees no card</strong></div>
+    </section>
+
+    <!-- 08 LIFECYCLE -->
+    <section class="slide" data-id="life">
+      <div class="s-inner">
+        <div class="reveal"><div class="eyebrow"><span class="idx">07</span><span class="sx">♦</span> The Lifecycle — One Hand <span class="ln"></span></div></div>
+        <h2 class="title reveal wide">From an empty table to a settled pot.</h2>
+        <p class="copy reveal">Money &amp; turn order are truth <span class="gd">on-chain</span>; the card protocol runs <span class="cy">peer-to-peer over WebSocket</span>.</p>
+        <div class="rail" id="rail">
+          <div class="baseline"></div><div class="fillline"></div>
+          <div class="railrow">
+            <div class="phase chain"><div class="ring"><svg class="ic"><use href="#i-seat"/></svg></div><div class="pn">Join</div><div class="pd">Both stake the buy-in.</div><span class="tag">chain</span></div>
+            <div class="phase chain"><div class="ring"><svg class="ic"><use href="#i-finger"/></svg></div><div class="pn">Commit</div><div class="pd">Post keccak256(seed).</div><span class="tag">chain</span></div>
+            <div class="phase crypto"><div class="ring"><svg class="ic"><use href="#i-shuffle"/></svg></div><div class="pn">Shuffle</div><div class="pd">The padlock dance.</div><span class="tag">crypto</span></div>
+            <div class="phase crypto"><div class="ring"><svg class="ic"><use href="#i-deal"/></svg></div><div class="pn">Deal</div><div class="pd">Sealed hole cards.</div><span class="tag">crypto</span></div>
+            <div class="phase chain"><div class="ring"><svg class="ic"><use href="#i-coin"/></svg></div><div class="pn">Bet</div><div class="pd">Preflop → river.</div><span class="tag">chain</span></div>
+            <div class="phase chain"><div class="ring"><svg class="ic"><use href="#i-trophy"/></svg></div><div class="pn">Showdown</div><div class="pd">Reveal, sign, settle.</div><span class="tag">chain</span></div>
+          </div>
+        </div>
       </div>
-      <div class="archBottom">
-        <div class="nh">PokerTable contract @ Avalanche Fuji C-Chain (43113)</div>
-        <div class="ns">pot custody · betting accounting · commit/reveal · dual-signed settlement · timeout slash · verified on Snowtrace</div>
+    </section>
+
+    <!-- 09 ARCHITECTURE -->
+    <section class="slide" data-id="arch">
+      <div class="s-inner">
+        <div class="reveal"><div class="eyebrow"><span class="idx">08</span><span class="sx">♣</span> The Shape Of It <span class="ln"></span></div></div>
+        <h2 class="title reveal wide">Two browsers, a keyless relay, and a chain.</h2>
+        <div class="arch reveal">
+          <div class="archGrid">
+            <div class="node"><div class="nh"><svg class="ic"><use href="#i-spade"/></svg>Player A</div><div class="ns">browser · wagmi + SRA crypto · holds own keys &amp; cards</div></div>
+            <div class="archWS">encrypted<br>card blobs<span class="pipe">⇆</span>never cleartext</div>
+            <div class="node"><div class="nh"><svg class="ic"><use href="#i-spade"/></svg>Player B</div><div class="ns">browser · wagmi + SRA crypto · holds own keys &amp; cards</div></div>
+          </div>
+          <div class="archConn">· · · ·</div>
+          <div class="node relay" style="max-width:540px;margin:0 auto;"><div class="nh"><svg class="ic"><use href="#i-node"/></svg>Relay / Coordinator</div><div class="ns">Node · WS relay + per-hand FSM + chain watcher + x402 route<br><strong style="color:var(--cyan)">holds no key · signs nothing · sees no card</strong></div></div>
+          <div class="archBottom"><div class="nh">PokerTable contract @ Avalanche Fuji C-Chain · 43113</div><div class="ns">pot custody · betting · commit/reveal · dual-signed settlement · timeout slash · Snowtrace-verified</div></div>
+        </div>
       </div>
-    </div>
-    <p class="body-copy" style="margin-top:30px;">
-      The relay exists only for liveness and coordination. Hole-card reveal shares are forwarded to one
-      recipient only, so the server never holds both locks on a private card. <strong>Card secrecy lives in the
-      browsers; money truth lives on the chain.</strong> The middle is powerless by design.
-    </p>
-  </div>
-</section>
+    </section>
 
-<div class="divider reveal"><span class="ln"></span>♥<span class="ln r"></span></div>
+    <!-- 10 PROOF -->
+    <section class="slide" data-id="proof">
+      <div class="s-inner" style="text-align:center;display:flex;flex-direction:column;align-items:center;">
+        <div class="reveal"><div class="eyebrow" style="justify-content:center;"><span class="idx">09</span><span class="sx">♠</span> Not Just Claims</div></div>
+        <h2 class="title reveal wide" style="text-align:center;">The hard parts are proven in isolation.</h2>
+        <div class="proof" style="width:100%;">
+          <div class="pcard reveal"><div class="pn"><span class="count" data-to="21">0</span></div><div class="pl">Foundry tests — AVAX table:<br>join · bet · settle · timeout · void</div></div>
+          <div class="pcard reveal"><div class="pn"><span class="count" data-to="5">0</span></div><div class="pl">Foundry tests — USDC / x402<br>EIP-3009 buy-in contract</div></div>
+          <div class="pcard reveal"><div class="pn"><span class="count" data-to="13">0</span></div><div class="pl">Vitest crypto tests —<br>commutativity, secrecy, shuffle</div></div>
+          <div class="pcard reveal"><div class="pn">∞</div><div class="pl">re-verifiable — anyone can<br>recheck keccak256(seed)==commit</div></div>
+        </div>
+      </div>
+    </section>
 
-<!-- ============================= PROOF ============================= -->
-<section>
-  <div class="wrap reveal">
-    <span class="kicker">Not Just Claims — It's Tested</span>
-    <h2 class="title">The hard parts are proven in isolation.</h2>
-    <div class="proof">
-      <div class="pcard reveal"><div class="pn">21</div><div class="pl">Foundry tests<br>AVAX PokerTable: join, bet, settle, timeout, void</div></div>
-      <div class="pcard reveal"><div class="pn">5</div><div class="pl">Foundry tests<br>USDC / x402 EIP-3009 buy-in contract</div></div>
-      <div class="pcard reveal"><div class="pn">13</div><div class="pl">Vitest crypto tests<br>commutativity, round-trip, hole-card secrecy, seeded shuffle</div></div>
-      <div class="pcard reveal"><div class="pn">∞</div><div class="pl">re-verifiable<br>anyone can recheck keccak256(seed)==commit</div></div>
-    </div>
-  </div>
-</section>
+    <!-- 11 WHY -->
+    <section class="slide" data-id="why">
+      <div class="s-inner">
+        <div class="reveal"><div class="eyebrow"><span class="idx">10</span><span class="sx">♦</span> Why It's Different <span class="ln"></span></div></div>
+        <h2 class="title reveal wide">No house edge. No trusted shuffle. No peeking.</h2>
+        <div class="fgrid">
+          <div class="feat reveal"><div class="fi"><svg class="ic"><use href="#i-spade"/></svg></div><h4>No house</h4><p>No operator taking a rake or holding the pot. Two players, a contract, a powerless relay.</p></div>
+          <div class="feat cy reveal"><div class="fi"><svg class="ic"><use href="#i-eyeoff"/></svg></div><h4>No one can peek</h4><p>A private card carries two locks — neither player nor the server ever holds both.</p></div>
+          <div class="feat reveal"><div class="fi"><svg class="ic"><use href="#i-shuffle"/></svg></div><h4>Provably-fair deal</h4><p>Commit-reveal binds the shuffle, then proves it — a check anyone can rerun.</p></div>
+          <div class="feat cy reveal"><div class="fi"><svg class="ic"><use href="#i-link"/></svg></div><h4>The pot pays itself</h4><p>Dual-signed, on-chain settlement; an honest player always recovers funds.</p></div>
+          <div class="feat reveal"><div class="fi"><svg class="ic"><use href="#i-shield"/></svg></div><h4>Can't be frozen</h4><p>A timeout slash means a staller forfeits their stake — never a deadlock.</p></div>
+          <div class="feat cy reveal"><div class="fi"><svg class="ic"><use href="#i-search"/></svg></div><h4>Verify everything</h4><p>Every settlement is a Snowtrace transaction. Trust replaced by a link.</p></div>
+        </div>
+      </div>
+    </section>
 
-<!-- ============================= FEATURES SUMMARY ============================= -->
-<section>
-  <div class="wrap reveal">
-    <span class="kicker">Why It's Different</span>
-    <h2 class="title">No house edge. No trusted shuffle. No peeking.</h2>
-    <div class="fgrid">
-      <div class="feat reveal"><div class="fi">♠</div><h4>No house</h4><p>There is no operator taking a rake or holding the pot. Two players, a contract, and a powerless relay.</p></div>
-      <div class="feat cy reveal"><div class="fi">🔒</div><h4>No one can peek</h4><p>SRA commutative encryption means a private card carries two locks — neither player nor the server ever holds both.</p></div>
-      <div class="feat reveal"><div class="fi">🎲</div><h4>Provably-fair deal</h4><p>Commit-reveal binds the shuffle before any card moves, then proves it after — the same check anyone can rerun.</p></div>
-      <div class="feat cy reveal"><div class="fi">⛓️</div><h4>The pot pays itself</h4><p>Settlement is dual-signed and on-chain; an honest player always recovers their funds, worst case by timeout.</p></div>
-      <div class="feat reveal"><div class="fi">🛡️</div><h4>Can't be frozen</h4><p>A timeout slash guarantees a staller forfeits their stake — the game can never deadlock with your money inside.</p></div>
-      <div class="feat cy reveal"><div class="fi">🔍</div><h4>Verify everything</h4><p>Every settlement is a transaction you can open on Snowtrace. Trust is replaced by a link.</p></div>
-    </div>
-  </div>
-</section>
+    <!-- 12 CLOSE -->
+    <section class="slide close-slide" data-id="close">
+      <div class="s-inner" style="display:flex;flex-direction:column;align-items:center;">
+        <div class="reveal in"><span class="seal" style="width:84px;height:84px;display:inline-grid;"><span class="dash"></span><span class="spade" style="font-size:40px;">♠</span><span class="lock" style="width:26px;height:26px;"><svg class="ic" style="width:12px;height:12px"><use href="#i-lock"/></svg></span></span></div>
+        <h2 class="title reveal in" style="font-size:clamp(34px,6vw,58px);margin-top:20px;max-width:none;text-align:center;">Sealed Deck</h2>
+        <p class="lede reveal in" style="text-align:center;">Trustless heads-up poker on Avalanche. Trust replaced by cryptography and a link.</p>
+        <div class="stackrow reveal in">
+          <span class="tech">Solidity · Foundry</span><span class="tech">SRA mental poker</span><span class="tech">React · wagmi/viem</span><span class="tech">Node · WS relay</span><span class="tech">x402 · EIP-3009</span><span class="tech">EIP-712</span><span class="tech">Avalanche Fuji</span>
+        </div>
+        <p class="footnote reveal in">Sources: <a href="https://en.wikipedia.org/wiki/Mental_poker">Mental Poker — Shamir, Rivest &amp; Adleman, 1979</a> · <a href="https://upswingpoker.com/ultimate-bet-absolute-poker-scandal/">UltimateBet &amp; Absolute Poker scandal</a></p>
+      </div>
+    </section>
 
-<!-- ============================= FOOTER ============================= -->
-<footer>
-  <div class="wrap">
-    <div class="seal" style="width:80px;height:80px;margin:0 auto;">
-      <span class="dash"></span>
-      <span class="spade" style="font-size:38px;">♠</span>
-      <span class="lock" style="width:24px;height:24px;font-size:11px;">🔒</span>
-    </div>
-    <h2 class="title" style="font-size:34px;margin-top:24px;">Sealed Deck</h2>
-    <p class="lede" style="margin:14px auto 0;text-align:center;">Trustless heads-up poker on Avalanche. The deck is sealed by cryptography, the pot pays itself.</p>
-    <div class="stackrow">
-      <span class="tech">Solidity · Foundry</span>
-      <span class="tech">SRA mental poker</span>
-      <span class="tech">React · Vite · wagmi/viem</span>
-      <span class="tech">Node · WebSocket relay</span>
-      <span class="tech">x402 · EIP-3009 USDC</span>
-      <span class="tech">EIP-712 settlement</span>
-      <span class="tech">Avalanche Fuji C-Chain</span>
-    </div>
-    <p class="footnote">
-      Built for an Avalanche hackathon · Heads-up, one hand per contract instance · Fairness via commit-reveal + SRA commutative encryption.<br>
-      Sources: <a href="https://en.wikipedia.org/wiki/Mental_poker">Mental Poker (Shamir, Rivest &amp; Adleman, 1979)</a> · <a href="https://upswingpoker.com/ultimate-bet-absolute-poker-scandal/">UltimateBet &amp; Absolute Poker superuser scandal</a>
-    </p>
   </div>
-</footer>
+</div>
+
+<button class="chev prev" id="prev" aria-label="Previous">‹</button>
+<button class="chev next" id="next" aria-label="Next">›</button>
+<div class="hint" id="hint">← / → to navigate · N for script</div>
+<button class="notesbtn" id="notesbtn">Caption ▴</button>
+<div class="notes" id="notes"><div class="lbl"> <span id="notesId"></span></div><p id="notesText"></p></div>
 
 <script>
-// scroll-reveal
-const io = new IntersectionObserver((entries)=>{
-  for(const e of entries){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }
-},{threshold:.12, rootMargin:'0px 0px -8% 0px'});
-document.querySelectorAll('.reveal').forEach((el,i)=>{
-  // small stagger for grids
-  el.style.transitionDelay = (Math.min(i%4,3)*60)+'ms';
-  io.observe(el);
-});
+(function(){
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const track = document.getElementById('track');
+  const slides = [...document.querySelectorAll('.slide')];
+  const N = slides.length;
+  const idOf = i => slides[i].dataset.id;
+
+  // per-slide concise speaker scripts
+  const SCRIPT = {
+    title:   "This is Sealed Deck — trustless heads-up poker on Avalanche. No house, no operator: the deck is sealed by cryptography and the pot pays itself.",
+    problem: "Every online card game asks you to trust the dealer to shuffle fairly and not peek. In the UltimateBet scandal, insiders who could see hole cards stole over fifty million dollars across years. The fix isn't a better operator — it's removing the operator's power.",
+    idea:    "In 1979 the inventors of RSA asked: can two players who don't trust each other deal a fair hand with no trusted dealer? Sealed Deck is the modern build of their answer.",
+    dance:   "Each card is a number locked with a player's secret key, and the locks commute — they come off in any order. Both players lock and shuffle; to deal a card, the other peels off just their lock, leaving one only the owner can open.",
+    fair:    "Encryption keeps cards secret; commit-reveal keeps the shuffle honest. Each player publishes a hash of their shuffle seed before any card moves, so it can't be changed after peeking. At showdown the seeds are revealed and anyone can verify.",
+    money:   "Both players stake into a contract — no house holds the pot. It moves only four ways: a settlement both sign, a fold, a timeout that slashes a staller, or a void that refunds each player. No one can claim alone, and an honest player always gets their funds back.",
+    x402:    "You can also buy in with USDC, gaslessly: the player signs an EIP-3009 authorization off-chain over the x402 standard, and it settles straight into the table contract.",
+    life:    "One hand end to end: join and stake, commit the seed, shuffle, deal, bet across four streets, then reveal and settle. Money and turns live on-chain; the card protocol runs peer-to-peer over WebSocket.",
+    arch:    "Two browsers hold the keys and the cards. The relay in the middle coordinates but holds no key, signs nothing, and never sees a card. The contract on Fuji holds the pot and settles it.",
+    proof:   "This isn't hand-waving — the contracts pass twenty-six Foundry tests, the crypto passes thirteen, and the fairness check is re-verifiable by anyone.",
+    why:     "To recap: no house edge, no one can peek, a provably-fair deal, a pot that pays itself, a game that can't be frozen, and every settlement verifiable on Snowtrace.",
+    close:   "Sealed Deck — trust replaced by cryptography and a link. Thank you."
+  };
+
+  let cur = 0;
+  document.getElementById('ctot').textContent = String(N).padStart(2,'0');
+
+  // notes
+  const notes=document.getElementById('notes'), notesText=document.getElementById('notesText'), notesId=document.getElementById('notesId'), notesBtn=document.getElementById('notesbtn');
+  let notesOpen=false;
+  function renderNotes(){ notesId.textContent=idOf(cur); notesText.textContent=SCRIPT[idOf(cur)]||''; }
+  function toggleNotes(f){ notesOpen=(f===undefined)?!notesOpen:f; notes.classList.toggle('show',notesOpen); notesBtn.textContent='Caption '+(notesOpen?'▾':'▴'); }
+  notesBtn.onclick=()=>toggleNotes();
+
+  const prevBtn=document.getElementById('prev'), nextBtn=document.getElementById('next'), hint=document.getElementById('hint');
+
+  function revealSlide(s){ s.querySelectorAll('.reveal').forEach((el,k)=>{ el.classList.remove('in'); void el.offsetWidth; el.style.transitionDelay=(Math.min(k,6)*70)+'ms'; el.classList.add('in'); }); }
+
+  // title intro: cards fan in, then after 2s the complete logo assembles & cards spread
+  let titleTimer=null;
+  function playTitleIntro(){
+    const fcEl=document.getElementById('floatcards'), slide=slides[0];
+    clearTimeout(titleTimer);
+    slide.querySelectorAll('.reveal').forEach(el=>{ el.classList.remove('in'); el.style.transitionDelay=''; });
+    fcEl.classList.remove('show'); fcEl.classList.add('gathered');
+    if(reduce){ fcEl.classList.add('show'); fcEl.classList.remove('gathered'); revealSlide(slide); return; }
+    requestAnimationFrame(()=>requestAnimationFrame(()=> fcEl.classList.add('show')));   // fan the cards in
+    titleTimer=setTimeout(()=>{ fcEl.classList.remove('gathered'); revealSlide(slide); }, 2000); // assemble logo
+  }
+
+  function go(i){
+    i=Math.max(0,Math.min(N-1,i)); cur=i;
+    track.style.transform = reduce ? 'none' : `translateX(${-i*100}vw)`;
+    if(reduce){ slides.forEach((s,j)=> s.style.display = j===i?'grid':'none'); }
+    document.getElementById('progress').style.width = (i/(N-1)*100)+'%';
+    document.getElementById('cnum').textContent = String(i+1).padStart(2,'0');
+    slides.forEach((s,j)=> s.classList.toggle('active', j===i));
+    prevBtn.disabled = i===0; nextBtn.disabled = i===N-1;
+    if(idOf(i)!=='title') revealSlide(slides[i]);
+    renderNotes();
+    onActivate(idOf(i));
+  }
+
+  function onActivate(id){
+    demoControl(id==='dance');
+    if(id==='title') playTitleIntro(); else clearTimeout(titleTimer);
+    if(id==='life'){ const r=document.getElementById('rail'); r.classList.remove('in'); void r.offsetWidth; r.querySelectorAll('.phase').forEach((p,k)=>p.style.transitionDelay=(k*130)+'ms'); requestAnimationFrame(()=>r.classList.add('in')); }
+    // count-ups in this slide
+    slides[cur].querySelectorAll('.count').forEach(el=>{ el.dataset.done=''; animateCount(el); });
+  }
+
+  function go_rel(d){ go(cur+d); if(hint){ hint.style.opacity=0; } }
+
+  // keyboard
+  addEventListener('keydown', e=>{
+    if(['ArrowRight','ArrowDown','PageDown',' '].includes(e.key)){ e.preventDefault(); go_rel(1); }
+    else if(['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){ e.preventDefault(); go_rel(-1); }
+    else if(e.key==='Home'){ go(0); } else if(e.key==='End'){ go(N-1); }
+    else if(e.key==='n'||e.key==='N'){ toggleNotes(); }
+    else if(e.key==='f'||e.key==='F'){ if(!document.fullscreenElement) document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.(); }
+  });
+  prevBtn.onclick=()=>go_rel(-1); nextBtn.onclick=()=>go_rel(1);
+
+  // touch swipe
+  let tsx=0,tsy=0;
+  addEventListener('touchstart',e=>{ tsx=e.touches[0].clientX; tsy=e.touches[0].clientY; },{passive:true});
+  addEventListener('touchend',e=>{ const dx=e.changedTouches[0].clientX-tsx, dy=e.changedTouches[0].clientY-tsy; if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)) go_rel(dx<0?1:-1); },{passive:true});
+
+  // count-up
+  function animateCount(el){
+    if(el.dataset.done==='1') return; el.dataset.done='1';
+    const to=+el.dataset.to, pre=el.dataset.pre||'', suf=el.dataset.suf||'', dur=1300, t0=performance.now();
+    if(reduce){ el.textContent=pre+to+suf; return; }
+    (function step(t){ const k=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-k,3); el.textContent=pre+Math.round(to*e)+suf; if(k<1) requestAnimationFrame(step); })(t0);
+  }
+
+  // spotlight
+  const spot=document.getElementById('spot');
+  if(!reduce){ let tx=innerWidth/2,ty=innerHeight/2,cx=tx,cy=ty;
+    addEventListener('pointermove',e=>{tx=e.clientX;ty=e.clientY;},{passive:true});
+    (function loop(){cx+=(tx-cx)*.12;cy+=(ty-cy)*.12;spot.style.transform=`translate(${cx}px,${cy}px) translate(-50%,-50%)`;requestAnimationFrame(loop);})();
+  } else spot.style.display='none';
+
+  // title parallax — moves the .fc-in wrapper so card flip + gather/spread position stay intact
+  const stage=document.getElementById('titleStage'), fcs=[...document.querySelectorAll('#floatcards .fc')];
+  if(!reduce && stage){ let px=0,py=0,rx=0,ry=0;
+    stage.addEventListener('pointermove',e=>{const r=stage.getBoundingClientRect();px=((e.clientX-r.left)/r.width-.5);py=((e.clientY-r.top)/r.height-.5);});
+    stage.addEventListener('pointerleave',()=>{px=0;py=0;});
+    (function loop(){rx+=(px-rx)*.07;ry+=(py-ry)*.07;
+      fcs.forEach((fc,i)=>{const d=(i+1)*9;const w=fc.querySelector('.fc-in');if(w)w.style.transform=`translate(${rx*d}px,${ry*d}px)`;});
+      requestAnimationFrame(loop);})();
+  }
+
+  // ---- padlock dance demo ----
+  const demo=document.getElementById('demo'), deckrow=document.getElementById('deckrow'), capEl=document.getElementById('demoCap'), dotsEl=document.getElementById('demoDots'), stageLbl=document.getElementById('stageLbl');
+  const STAGES=[
+    {k:'deck',cap:'A fresh deck. No one has touched the order yet.'},
+    {k:'lockA',cap:'Seat A encrypts every card with key A — the first padlock.'},
+    {k:'shuffleA',cap:'…and shuffles. The order is now hidden from B.'},
+    {k:'lockB',cap:'Seat B adds key B on top — locks commute.'},
+    {k:'shuffleB',cap:'B shuffles again. Now neither player knows the order.'},
+    {k:'peel',cap:'To deal A’s card, B peels off only B’s lock.'},
+    {k:'reveal',cap:'One lock remains. Only A can open it — privately.'},
+  ];
+  STAGES.forEach((_,i)=>{const d=document.createElement('span');d.className='dot'+(i===0?' on':'');dotsEl.appendChild(d);});
+  const ddots=[...dotsEl.children];
+  let si=0,timer=null,running=false;
+  function setStage(i){ const s=STAGES[i]; demo.dataset.stage=s.k; capEl.style.opacity=0;
+    setTimeout(()=>{capEl.textContent=s.cap;capEl.style.opacity=1;},150);
+    ddots.forEach((d,j)=>d.classList.toggle('on',j===i)); stageLbl.textContent='stage '+(i+1)+' / '+STAGES.length;
+    if(!reduce&&(s.k==='shuffleA'||s.k==='shuffleB')){deckrow.classList.remove('shuffling');void deckrow.offsetWidth;deckrow.classList.add('shuffling');}else deckrow.classList.remove('shuffling');
+  }
+  function tick(){ si=(si+1)%STAGES.length; setStage(si); timer=setTimeout(tick, si===0?1500:2100); }
+  function demoControl(on){ if(on){ if(running)return; running=true; si=0; setStage(0); timer=setTimeout(tick,1800);} else { running=false; clearTimeout(timer);} }
+  if(reduce) setStage(6);
+
+  // boot
+  if(reduce){ slides.forEach((s,j)=>{ s.style.display=j===0?'grid':'none'; }); }
+  go(0);
+})();
 </script>
 </body>
 </html>
